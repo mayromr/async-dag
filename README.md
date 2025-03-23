@@ -8,7 +8,6 @@ A simple library for running complex DAG of async tasks
 import asyncio
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Awaitable, Callable
 
 from async_dag import build_dag
 
@@ -69,19 +68,12 @@ async def logger(
     print(event_1, result_1, event_2, result_2)
 
 
-def url_immediate(url: str) -> Callable[[], Awaitable[str]]:
-    async def _inner() -> str:
-        return url
-
-    return _inner
-
-
 with build_dag(Parameters) as tm:
-    moon_url = tm.add_node(url_immediate("moon"))
+    moon_url = tm.add_immediate_node("moon")
     moon_event = tm.add_node(fetch_event, moon_url)
     moon_insert = tm.add_node(insert_to_db, moon_event)
 
-    sun_url = tm.add_node(url_immediate("sun"))
+    sun_url = tm.add_immediate_node("sun")
     sun_event = tm.add_node(fetch_event, sun_url)
     sun_insert = tm.add_node(insert_to_db, sun_event)
 

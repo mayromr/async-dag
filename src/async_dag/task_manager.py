@@ -63,6 +63,14 @@ class TaskManager[_ParametersType]:
         for task in self._tasks:
             self._sorted_batches[task._depth].append(task)
 
+    def add_immediate_node[_ReturnType](
+        self, value: _ReturnType
+    ) -> TaskNode[_ParametersType, _ReturnType]:
+        async def get_value() -> _ReturnType:
+            return value
+
+        return self.add_node(get_value)
+
     @overload
     def add_node[_ReturnType](
         self,

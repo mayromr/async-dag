@@ -198,3 +198,13 @@ async def test_sort_with_non_dag_graph_errors() -> None:
 
         node_1._dependencies_ids = [node_2._id]
         node_2._dependencies_ids = [node_1._id]
+
+
+async def test_immediate_node_should_return_its_value() -> None:
+    expected = "Hello World"
+    with build_dag() as tm:
+        imm_node = tm.add_immediate_node(expected)
+
+    result = await tm.invoke(None)
+
+    assert imm_node.extract_result(result) == expected
