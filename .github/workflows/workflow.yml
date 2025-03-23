@@ -1,0 +1,14 @@
+name: Pull request and main workflow
+
+on:
+  pull_request:
+    types: ["opened", "edited", "reopened", "synchronize"]
+  push:
+    branches:
+      - 'main'
+
+jobs:
+  run_lint:
+    uses: ./.github/workflows/lint.yml
+  run_test:
+    uses: ./.github/workflows/test.yml

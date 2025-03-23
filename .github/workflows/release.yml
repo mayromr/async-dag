@@ -1,0 +1,17 @@
+name: Release workflow
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  run_lint:
+    uses: ./.github/workflows/lint.yml
+  run_test:
+    uses: ./.github/workflows/test.yml
+  publish:
+    needs: [run_lint, run_test]
+    uses: ./.github/workflows/publish.yml
