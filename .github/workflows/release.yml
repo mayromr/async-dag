@@ -14,4 +14,7 @@ jobs:
     uses: ./.github/workflows/test.yml
   publish:
     needs: [run_lint, run_test]
+    permissions:
+      id-token: write
+      contents: read
     uses: ./.github/workflows/publish.yml
