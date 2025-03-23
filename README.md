@@ -102,9 +102,9 @@ async def main():
     second_result = await tm.invoke(Parameters(http_client, db_client, "sun"))
 
     # Event(timestamp=datetime.datetime(2025, 3, 23, 16, 13, 57, 48707), location='moon')
-    print(moon_event.extract_result(second_result))  # prints:
+    print(moon_event.extract_result(second_result))
     # False
-    print(moon_insert.extract_result(second_result))  # prints: sun
+    print(moon_insert.extract_result(second_result))
 
 
 if __name__ == "__main__":
