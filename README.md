@@ -7,65 +7,114 @@ A simple library for running complex DAG of async tasks
 ```python
 import asyncio
 from dataclasses import dataclass
+from datetime import datetime
+from typing import Awaitable, Callable
 
-from async_dag import TaskManager
+from async_dag import build_dag
 
 
 @dataclass
-class Input:
-    starting_number: int
+class Event:
+    timestamp: datetime
+    location: str
 
 
-async def imm() -> int:
-    return 1
+class DatabaseClient:
+    async def insert(self, event: Event) -> bool:
+        # simulate async access to the database
+        await asyncio.sleep(0.5)
+
+        return True
 
 
-async def inc(n: int) -> int:
-    return n + 1
+class HttpClient:
+    async def fetch(self, url: str) -> Event:
+        # simulate async http request
+        await asyncio.sleep(0.5)
+
+        return Event(timestamp=datetime.now(), location=url)
+
+    async def publish_logs(self, results: list[bool]) -> None:
+        # simulate async http request
+        await asyncio.sleep(0.5)
 
 
-async def to_str(n: int) -> str:
-    return str(n)
+@dataclass
+class Parameters:
+    http_client: HttpClient
+    db_client: DatabaseClient
+    allowed_locations: str
 
 
-async def to_int(n: str, _input: Input) -> int:
-    return int(n)
+async def fetch_event(url: str, params: Parameters) -> Event:
+    # NOTE: we have access to the invoke params, http client for example
+    return await params.http_client.fetch(url)
 
 
-async def inc_str(n: str) -> int:
-    return int(n) + 1
+async def insert_to_db(event: Event, params: Parameters) -> bool:
+    if event.location != params.allowed_locations:
+        return False
+
+    return await params.db_client.insert(event)
 
 
-async def inc_max(a: int, b: int) -> int:
-    return max(a, b) + 1
+async def publish_results(result_1: bool, result_2: bool, params: Parameters) -> None:
+    await params.http_client.publish_logs([result_1, result_2])
 
 
-with build_dag(Input) as tm:
-    starting_node = tm.add_node(imm)
+# NOTE: we don't have to request receive the Parameters argument, we can also request nodes that are not in the last batch
+async def logger(
+    event_1: Event, result_1: bool, event_2: Event, result_2: bool
+) -> None:
+    print(event_1, result_1, event_2, result_2)
 
-    inc_1 = tm.add_node(inc, starting_node)
 
-    str_node = tm.add_node(to_str, starting_node)
-    str_to_int_node = tm.add_node(to_int, str_node)
-    int_node = tm.add_node(inc_str, str_node)
-    inc_2 = tm.add_node(inc, int_node)
+def url_immediate(url: str) -> Callable[[], Awaitable[str]]:
+    async def _inner() -> str:
+        return url
 
-    end_1 = tm.add_node(inc_max, inc_2, inc_1)
+    return _inner
 
-    end_2 = tm.add_node(inc_max, inc_1, starting_node)
 
-    end_3 = tm.add_node(inc_max, str_to_int_node, starting_node)
+with build_dag(Parameters) as tm:
+    moon_url = tm.add_node(url_immediate("moon"))
+    moon_event = tm.add_node(fetch_event, moon_url)
+    moon_insert = tm.add_node(insert_to_db, moon_event)
 
-result_1 = await tm.invoke(Input(0))
+    sun_url = tm.add_node(url_immediate("sun"))
+    sun_event = tm.add_node(fetch_event, sun_url)
+    sun_insert = tm.add_node(insert_to_db, sun_event)
 
-result_2 = await tm.invoke(Input(999))
+    tm.add_node(publish_results, moon_insert, sun_insert)
 
-assert end_1.extract_result(result_1) == 3
-assert end_2.extract_result(result_1) == 2
-assert end_3.extract_result(result_1) == 1
+    tm.add_node(logger, moon_event, moon_insert, sun_event, sun_insert)
 
-assert end_1.extract_result(result_2) == 1002
-assert end_2.extract_result(result_2) == 1001
-assert end_3.extract_result(result_2) == 1000
 
+async def main():
+    http_client = HttpClient()
+    db_client = DatabaseClient()
+
+    # prints due to logger
+    # Event(timestamp=datetime.datetime(2025, 3, 23, 16, 13, 55, 498349), location='moon') True Event(timestamp=datetime.datetime(2025, 3, 23, 16, 13, 55, 498361), location='sun') False
+    first_result = await tm.invoke(Parameters(http_client, db_client, "moon"))
+
+    # Event(timestamp=datetime.datetime(2025, 3, 23, 16, 13, 55, 498349), location='moon')
+    # NOTE: the result of each node using the ExecutionResult object
+    print(moon_event.extract_result(first_result))
+    # True
+    print(moon_insert.extract_result(first_result))
+
+    # prints due to logger
+    # Event(timestamp=datetime.datetime(2025, 3, 23, 16, 13, 57, 48707), location='moon') False Event(timestamp=datetime.datetime(2025, 3, 23, 16, 13, 57, 48717), location='sun') True
+    # NOTE: we can use the same TaskGroup many times, there is no need to rebuild the DAG
+    second_result = await tm.invoke(Parameters(http_client, db_client, "sun"))
+
+    # Event(timestamp=datetime.datetime(2025, 3, 23, 16, 13, 57, 48707), location='moon')
+    print(moon_event.extract_result(second_result))  # prints:
+    # False
+    print(moon_insert.extract_result(second_result))  # prints: sun
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
