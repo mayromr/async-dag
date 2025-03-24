@@ -1,8 +1,106 @@
 async-dag
 ---
-A simple library for running complex DAG of async tasks
+A simple library for running complex DAG of async tasks.
 
-#### example
+### Use case example
+
+Lets assume that you have the following task dependencies graph:
+```mermaid
+graph TD;
+    FastTask_A-->SlowTask_B;
+    SlowTask_B-->EndTask;
+
+    SlowTask_A-->FastTask_C;
+    FastTask_B-->FastTask_C;
+    FastTask_C-->EndTask;
+```
+
+The optimal way to run this flow would be:
+
+1) Run `FastTask_A`, `FastTask_B`, and `SlowTask_A` all at once,
+2) as soon as `FastTask_A` ends, start executing `SlowTask_B`
+3) as soon as `SlowTask_A` and `FastTask_B` ends, start executing `FastTask_C`
+4) as soon as `SlowTask_B` and `FastTask_C` ends, start executing `EndTask`
+
+Creating this flow in code isn't trivial and require managing tasks manually, and from my experience most people miss the performance benefits of starting to execute `SlowTask_B` as soon as possible
+(because it's just easy to `gather(FastTask_A, SlowTask_A, FastTask_B)`).
+
+This library provides a simple interface for creating the optimal execution path of DAGs like those.
+
+#### Code example
+```python
+import asyncio
+from typing import Awaitable, Callable
+
+from async_dag import build_dag
+
+# Helper functions to define our tasks
+
+def define_one_arg_task(name: str, delay: float) -> Callable[[int], Awaitable[int]]:
+    async def _task(n: int) -> int:
+        print(f"{name} task started...")
+        await asyncio.sleep(delay)
+        print(f"{name} task done!")
+
+        return n + 1
+
+    return _task
+
+
+def define_two_arg_task(
+    name: str, delay: float
+) -> Callable[[int, int], Awaitable[int]]:
+    async def _task(a: int, b: int) -> int:
+        print(f"{name} task started...")
+        await asyncio.sleep(delay)
+        print(f"{name} task done!")
+
+        return a + b
+
+    return _task
+
+
+# Define the DAG
+with build_dag(int) as tm:
+    fast_task_a = tm.add_node(define_one_arg_task("fast_task_a", 0.1))
+    slow_task_b = tm.add_node(define_one_arg_task("slow_task_b", 1), fast_task_a)
+
+    slow_task_a = tm.add_node(define_one_arg_task("slow_task_a", 0.5))
+    fast_task_b = tm.add_node(define_one_arg_task("fast_task_b", 0.1))
+    fast_task_c = tm.add_node(
+        define_two_arg_task("fast_task_c", 0.1), slow_task_a, fast_task_b
+    )
+
+    end_task = tm.add_node(define_two_arg_task("end_task", 0), fast_task_c, slow_task_b)
+
+
+# Invoke the DAG
+async def main():
+    # prints:
+    # fast_task_a task started...
+    # slow_task_a task started...
+    # fast_task_b task started...
+    # fast_task_a task done!
+    # fast_task_b task done!
+    # slow_task_b task started...
+    # slow_task_a task done!
+    # fast_task_c task started...
+    # fast_task_c task done!
+    # slow_task_b task done!
+    # end_task task started...
+    # end_task task done!
+    execution_result = await tm.invoke(0)
+
+    # we can extract each node return value
+    print(fast_task_a.extract_result(execution_result))  # 1
+    print(end_task.extract_result(execution_result))  # 4
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+#### Another code example
 
 ```python
 import asyncio
