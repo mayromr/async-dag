@@ -30,48 +30,63 @@ This library provides a simple interface for creating the optimal execution path
 #### Code example
 ```python
 import asyncio
-from typing import Awaitable, Callable
 
 from async_dag import build_dag
 
-# Helper functions to define our tasks
 
-def define_one_arg_task(name: str, delay: float) -> Callable[[int], Awaitable[int]]:
-    async def _task(n: int) -> int:
-        print(f"{name} task started...")
-        await asyncio.sleep(delay)
-        print(f"{name} task done!")
+async def inc_task(name: str, delay: float, n: int) -> int:
+    print(f"{name} task started...")
+    await asyncio.sleep(delay)
+    print(f"{name} task done!")
 
-        return n + 1
-
-    return _task
+    return n + 1
 
 
-def define_two_arg_task(
-    name: str, delay: float
-) -> Callable[[int, int], Awaitable[int]]:
-    async def _task(a: int, b: int) -> int:
-        print(f"{name} task started...")
-        await asyncio.sleep(delay)
-        print(f"{name} task done!")
+async def add_task(name: str, delay: float, a: int, b: int) -> int:
+    print(f"{name} task started...")
+    await asyncio.sleep(delay)
+    print(f"{name} task done!")
 
-        return a + b
-
-    return _task
+    return a + b
 
 
 # Define the DAG
 with build_dag(int) as tm:
-    fast_task_a = tm.add_node(define_one_arg_task("fast_task_a", 0.1))
-    slow_task_b = tm.add_node(define_one_arg_task("slow_task_b", 1), fast_task_a)
-
-    slow_task_a = tm.add_node(define_one_arg_task("slow_task_a", 0.5))
-    fast_task_b = tm.add_node(define_one_arg_task("fast_task_b", 0.1))
-    fast_task_c = tm.add_node(
-        define_two_arg_task("fast_task_c", 0.1), slow_task_a, fast_task_b
+    # tm.add_immediate_node(...) defines a graph node that resolve immediately and returns its value, this is useful for passing constants to tasks
+    # if the last parameter is emitted and matches the type passed into `build_dag` the invoke parameter(the value passed to `tm.invoke`) will be passed automatically
+    fast_task_a = tm.add_node(
+        inc_task, tm.add_immediate_node("fast_task_a"), tm.add_immediate_node(0.1)
     )
 
-    end_task = tm.add_node(define_two_arg_task("end_task", 0), fast_task_c, slow_task_b)
+    # here we pass the result from fast_task_a as the n param to inc_task node
+    slow_task_b = tm.add_node(
+        inc_task,
+        tm.add_immediate_node("slow_task_b"),
+        tm.add_immediate_node(1),
+        fast_task_a,
+    )
+
+    slow_task_a = tm.add_node(
+        inc_task, tm.add_immediate_node("slow_task_a"), tm.add_immediate_node(0.5)
+    )
+    fast_task_b = tm.add_node(
+        inc_task, tm.add_immediate_node("fast_task_b"), tm.add_immediate_node(0.1)
+    )
+    fast_task_c = tm.add_node(
+        add_task,
+        tm.add_immediate_node("fast_task_c"),
+        tm.add_immediate_node(0.1),
+        slow_task_a,
+        fast_task_b,
+    )
+
+    end_task = tm.add_node(
+        add_task,
+        tm.add_immediate_node("end_task"),
+        tm.add_immediate_node(0.1),
+        fast_task_c,
+        slow_task_b,
+    )
 
 
 # Invoke the DAG
