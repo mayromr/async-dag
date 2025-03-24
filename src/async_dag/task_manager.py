@@ -1,4 +1,3 @@
-import asyncio
 import inspect
 from collections.abc import Awaitable, Callable, Iterator
 from contextlib import contextmanager
@@ -16,29 +15,24 @@ type TaskCallback[_ParametersType, _ReturnType, *_Inputs] = (
 
 class TaskManager[_ParametersType]:
     def __init__(self) -> None:
+        # NOTE: the tasks in _tasks must be a contiguous array of sorted by _id
         self._tasks: list[TaskNode[_ParametersType, object]] = []
         self._max_depth = 0
-        self._sorted_batches: list[list[TaskNode[_ParametersType, object]]] | None = (
-            None
-        )
+        self._starting_nodes_id: list[int] = []
+        self._is_sorted: bool = False
 
     async def invoke(
         self, parameters: _ParametersType
     ) -> ExecutionResult[_ParametersType]:
-        if self._sorted_batches is None:
+        if not self._is_sorted:
             raise ValueError("'invoke' can not be called before 'sort'")
 
-        execution_result = ExecutionResult([None] * len(self._tasks), self)
-
-        for batch in self._sorted_batches:
-            async with asyncio.TaskGroup() as tg:
-                for task in batch:
-                    tg.create_task(task.invoke(parameters, execution_result))
-
+        execution_result = ExecutionResult(self, parameters)
+        await execution_result._invoke()
         return execution_result
 
     def sort(self) -> None:
-        if self._sorted_batches is not None:
+        if self._is_sorted:
             raise ValueError("'sort' can only be called once")
 
         def visit(node: TaskNode[_ParametersType, object]) -> None:
@@ -59,9 +53,14 @@ class TaskManager[_ParametersType]:
         for task in self._tasks:
             if task._state == State.UNDISCOVERED:
                 visit(task)
-        self._sorted_batches = [[] for _ in range(self._max_depth + 1)]
+
         for task in self._tasks:
-            self._sorted_batches[task._depth].append(task)
+            if len(task._dependencies_ids) == 0:
+                self._starting_nodes_id.append(task._id)
+            for dep in task._dependencies_ids:
+                self._tasks[dep]._dependents_ids.add(task._id)
+
+        self._is_sorted = True
 
     def add_immediate_node[_ReturnType](
         self, value: _ReturnType
@@ -817,7 +816,7 @@ class TaskManager[_ParametersType]:
         | Callable[[*_InputsType], Awaitable[_ReturnType]],
         *dependencies: TaskNode[_ParametersType, object],
     ) -> TaskNode[_ParametersType, _ReturnType]:
-        if self._sorted_batches is not None:
+        if self._is_sorted:
             raise ValueError("'add_node' can not be called after 'sort'")
 
         for dep in dependencies:

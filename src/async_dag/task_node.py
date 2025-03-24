@@ -24,6 +24,7 @@ class TaskNode[_ParametersType, _ReturnType]:
         self._depth = 0
         self._id = node_id
         self._requires_parameters = requires_parameters
+        self._dependents_ids: set[int] = set()
 
     async def invoke(
         self,
@@ -48,8 +49,6 @@ class TaskNode[_ParametersType, _ReturnType]:
                     for dep_id in self._dependencies_ids
                 ],
             )
-
-        execution_result._results[self._id] = result
 
         return result
 
