@@ -57,7 +57,7 @@ async def add_task(a: int, b: int, name: str, delay: float) -> int:
 # Define the DAG (O(N) operation, where n is the number of nodes in the DAG)
 with build_dag(int) as tm:
     # Each node is made of an async function, and the parameters that will get passed to it at invoke time, a parameter can be either a value or another node.
-    # We are serenely creating a partially applied async function, just like `functools.partial`.
+    # We are essentially creating a partially applied async function, just like `functools.partial`.
 
     # tm.parameter_node is a spacial node that will get resolved into the invoke parameter (the value passed to `tm.invoke`)
     # you can also pass an immediate value to the node as a constant that will be the same across all invocations
