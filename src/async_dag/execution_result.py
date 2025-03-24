@@ -20,9 +20,11 @@ class ExecutionResult[_ParametersType]:
 
     async def _invoke_task(self, task_id: int, tg: asyncio.TaskGroup) -> None:
         task = self._tasks[task_id]
-
-        result = await task.invoke(self._parameters, self)
-        self._results[task._id] = result
+        if task is self._task_manager._parameters_node:
+            self._results[task._id] = self._parameters
+        else:
+            result = await task.invoke(self)
+            self._results[task._id] = result
 
         for dependent_id in task._dependents_ids:
             self._tasks_missing_dependencies_count[dependent_id] -= 1

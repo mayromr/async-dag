@@ -34,7 +34,7 @@ import asyncio
 from async_dag import build_dag
 
 
-async def inc_task(name: str, delay: float, n: int) -> int:
+async def inc_task(n: int, name: str, delay: float) -> int:
     print(f"{name} task started...")
     await asyncio.sleep(delay)
     print(f"{name} task done!")
@@ -42,7 +42,7 @@ async def inc_task(name: str, delay: float, n: int) -> int:
     return n + 1
 
 
-async def add_task(name: str, delay: float, a: int, b: int) -> int:
+async def add_task(a: int, b: int, name: str, delay: float) -> int:
     print(f"{name} task started...")
     await asyncio.sleep(delay)
     print(f"{name} task done!")
@@ -52,40 +52,49 @@ async def add_task(name: str, delay: float, a: int, b: int) -> int:
 
 # Define the DAG
 with build_dag(int) as tm:
+    # tm.parameters_node is a spacial node that will get resolved into the invoke parameters (the value passed to `tm.invoke`)
     # tm.add_immediate_node(...) defines a graph node that resolve immediately and returns its value, this is useful for passing constants to tasks
-    # if the last parameter is emitted and matches the type passed into `build_dag` the invoke parameter(the value passed to `tm.invoke`) will be passed automatically
     fast_task_a = tm.add_node(
-        inc_task, tm.add_immediate_node("fast_task_a"), tm.add_immediate_node(0.1)
+        inc_task,
+        tm.parameters_node,
+        tm.add_immediate_node("fast_task_a"),
+        tm.add_immediate_node(0.1),
     )
 
     # here we pass the result from fast_task_a as the n param to inc_task node
     slow_task_b = tm.add_node(
         inc_task,
+        fast_task_a,
         tm.add_immediate_node("slow_task_b"),
         tm.add_immediate_node(1),
-        fast_task_a,
     )
 
     slow_task_a = tm.add_node(
-        inc_task, tm.add_immediate_node("slow_task_a"), tm.add_immediate_node(0.5)
+        inc_task,
+        tm.parameters_node,
+        tm.add_immediate_node("slow_task_a"),
+        tm.add_immediate_node(0.5),
     )
     fast_task_b = tm.add_node(
-        inc_task, tm.add_immediate_node("fast_task_b"), tm.add_immediate_node(0.1)
+        inc_task,
+        tm.parameters_node,
+        tm.add_immediate_node("fast_task_b"),
+        tm.add_immediate_node(0.1),
     )
     fast_task_c = tm.add_node(
         add_task,
-        tm.add_immediate_node("fast_task_c"),
-        tm.add_immediate_node(0.1),
         slow_task_a,
         fast_task_b,
+        tm.add_immediate_node("fast_task_c"),
+        tm.add_immediate_node(0.1),
     )
 
     end_task = tm.add_node(
         add_task,
-        tm.add_immediate_node("end_task"),
-        tm.add_immediate_node(0.1),
         fast_task_c,
         slow_task_b,
+        tm.add_immediate_node("end_task"),
+        tm.add_immediate_node(0.1),
     )
 
 
@@ -109,115 +118,6 @@ async def main():
     # we can extract each node return value
     print(fast_task_a.extract_result(execution_result))  # 1
     print(end_task.extract_result(execution_result))  # 4
-
-
-if __name__ == "__main__":
-    asyncio.run(main())
-```
-
-#### Another code example
-
-```python
-import asyncio
-from dataclasses import dataclass
-from datetime import datetime
-
-from async_dag import build_dag
-
-
-@dataclass
-class Event:
-    timestamp: datetime
-    location: str
-
-
-class DatabaseClient:
-    async def insert(self, event: Event) -> bool:
-        # simulate async access to the database
-        await asyncio.sleep(0.5)
-
-        return True
-
-
-class HttpClient:
-    async def fetch(self, url: str) -> Event:
-        # simulate async http request
-        await asyncio.sleep(0.5)
-
-        return Event(timestamp=datetime.now(), location=url)
-
-    async def publish_logs(self, results: list[bool]) -> None:
-        # simulate async http request
-        await asyncio.sleep(0.5)
-
-
-@dataclass
-class Parameters:
-    http_client: HttpClient
-    db_client: DatabaseClient
-    allowed_locations: str
-
-
-async def fetch_event(url: str, params: Parameters) -> Event:
-    # NOTE: we have access to the invoke params, http client for example
-    return await params.http_client.fetch(url)
-
-
-async def insert_to_db(event: Event, params: Parameters) -> bool:
-    if event.location != params.allowed_locations:
-        return False
-
-    return await params.db_client.insert(event)
-
-
-async def publish_results(result_1: bool, result_2: bool, params: Parameters) -> None:
-    await params.http_client.publish_logs([result_1, result_2])
-
-
-# NOTE: we don't have to request receive the Parameters argument, we can also request nodes that are not in the last batch
-async def logger(
-    event_1: Event, result_1: bool, event_2: Event, result_2: bool
-) -> None:
-    print(event_1, result_1, event_2, result_2)
-
-
-with build_dag(Parameters) as tm:
-    moon_url = tm.add_immediate_node("moon")
-    moon_event = tm.add_node(fetch_event, moon_url)
-    moon_insert = tm.add_node(insert_to_db, moon_event)
-
-    sun_url = tm.add_immediate_node("sun")
-    sun_event = tm.add_node(fetch_event, sun_url)
-    sun_insert = tm.add_node(insert_to_db, sun_event)
-
-    tm.add_node(publish_results, moon_insert, sun_insert)
-
-    tm.add_node(logger, moon_event, moon_insert, sun_event, sun_insert)
-
-
-async def main():
-    http_client = HttpClient()
-    db_client = DatabaseClient()
-
-    # prints due to logger
-    # Event(timestamp=datetime.datetime(2025, 3, 23, 16, 13, 55, 498349), location='moon') True Event(timestamp=datetime.datetime(2025, 3, 23, 16, 13, 55, 498361), location='sun') False
-    first_result = await tm.invoke(Parameters(http_client, db_client, "moon"))
-
-    # Event(timestamp=datetime.datetime(2025, 3, 23, 16, 13, 55, 498349), location='moon')
-    # NOTE: the result of each node using the ExecutionResult object
-    print(moon_event.extract_result(first_result))
-    # True
-    print(moon_insert.extract_result(first_result))
-
-    # prints due to logger
-    # Event(timestamp=datetime.datetime(2025, 3, 23, 16, 13, 57, 48707), location='moon') False Event(timestamp=datetime.datetime(2025, 3, 23, 16, 13, 57, 48717), location='sun') True
-    # NOTE: we can use the same TaskGroup many times, there is no need to rebuild the DAG
-    second_result = await tm.invoke(Parameters(http_client, db_client, "sun"))
-
-    # Event(timestamp=datetime.datetime(2025, 3, 23, 16, 13, 57, 48707), location='moon')
-    print(moon_event.extract_result(second_result))
-    # False
-    print(moon_insert.extract_result(second_result))
 
 
 if __name__ == "__main__":

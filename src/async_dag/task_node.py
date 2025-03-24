@@ -15,7 +15,6 @@ class TaskNode[_ParametersType, _ReturnType]:
         task_manager: "TaskManager[_ParametersType]",
         dependencies_ids: Sequence[int],
         node_id: int,
-        requires_parameters: bool,
     ) -> None:
         self._task_manager = task_manager
         self._dependencies_ids = dependencies_ids
@@ -23,34 +22,18 @@ class TaskNode[_ParametersType, _ReturnType]:
         self._state = State.UNDISCOVERED
         self._depth = 0
         self._id = node_id
-        self._requires_parameters = requires_parameters
         self._dependents_ids: set[int] = set()
 
     async def invoke(
         self,
-        parameters: _ParametersType,
         execution_result: ExecutionResult[_ParametersType],
     ) -> _ReturnType:
         self._assert_state(State.PERMANENT)
         self._assert_task_manager(execution_result._task_manager)
 
-        if self._requires_parameters:
-            result = await self._callback(
-                *[
-                    execution_result._results[dep_id]
-                    for dep_id in self._dependencies_ids
-                ],
-                parameters,
-            )
-        else:
-            result = await self._callback(
-                *[
-                    execution_result._results[dep_id]
-                    for dep_id in self._dependencies_ids
-                ],
-            )
-
-        return result
+        return await self._callback(
+            *[execution_result._results[dep_id] for dep_id in self._dependencies_ids],
+        )
 
     def extract_result(
         self, execution_result: ExecutionResult[_ParametersType]

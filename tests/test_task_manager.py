@@ -42,12 +42,12 @@ async def inc_max(a: int, b: int) -> int:
 
 async def test_task_manager_sanity() -> None:
     tm = TaskManager[Input]()
-    starting_node = tm.add_node(from_args)
+    starting_node = tm.add_node(from_args, tm.parameters_node)
 
     inc_1 = tm.add_node(inc, starting_node)
 
     str_node = tm.add_node(to_str, starting_node)
-    str_to_int_node = tm.add_node(to_int, str_node)
+    str_to_int_node = tm.add_node(to_int, str_node, tm.parameters_node)
     int_node = tm.add_node(inc_str, str_node)
     inc_2 = tm.add_node(inc, int_node)
 
@@ -74,12 +74,12 @@ async def test_task_manager_sanity() -> None:
 
 async def test_build_dag_sanity() -> None:
     with build_dag(Input) as tm:
-        starting_node = tm.add_node(from_args)
+        starting_node = tm.add_node(from_args, tm.parameters_node)
 
         inc_1 = tm.add_node(inc, starting_node)
 
         str_node = tm.add_node(to_str, starting_node)
-        str_to_int_node = tm.add_node(to_int, str_node)
+        str_to_int_node = tm.add_node(to_int, str_node, tm.parameters_node)
         int_node = tm.add_node(inc_str, str_node)
         inc_2 = tm.add_node(inc, int_node)
 
@@ -104,7 +104,7 @@ async def test_build_dag_sanity() -> None:
 
 async def test_multiple_invocation() -> None:
     with build_dag(Input) as tm:
-        from_args_node = tm.add_node(from_args)
+        from_args_node = tm.add_node(from_args, tm.parameters_node)
 
     expected_1 = 0
     result_1 = await tm.invoke(Input(expected_1))
@@ -188,24 +188,32 @@ async def test_calling_order_of_dag() -> None:
     with build_dag(Input) as tm:
         starting_node = tm.add_immediate_node(None)
 
-        single_path_to_end_node_1 = tm.add_node(define_step(1, 0), starting_node)
+        single_path_to_end_node_1 = tm.add_node(
+            define_step(1, 0), starting_node, tm.parameters_node
+        )
         single_path_to_end_node_2 = tm.add_node(
-            define_step(2, 0), single_path_to_end_node_1
+            define_step(2, 0), single_path_to_end_node_1, tm.parameters_node
         )
 
-        merge_path_to_end_node_1_1 = tm.add_node(define_step(3, 0.1), starting_node)
-        merge_path_to_end_node_1_2 = tm.add_node(define_step(4, 0.15), starting_node)
+        merge_path_to_end_node_1_1 = tm.add_node(
+            define_step(3, 0.1), starting_node, tm.parameters_node
+        )
+        merge_path_to_end_node_1_2 = tm.add_node(
+            define_step(4, 0.15), starting_node, tm.parameters_node
+        )
 
         merge_path_to_end_node_2 = tm.add_node(
             define_merge_step(5, 0),
             merge_path_to_end_node_1_1,
             merge_path_to_end_node_1_2,
+            tm.parameters_node,
         )
 
         tm.add_node(
             define_merge_step(6, 0),
             single_path_to_end_node_2,
             merge_path_to_end_node_2,
+            tm.parameters_node,
         )
 
     await tm.invoke(Input(1))
@@ -247,6 +255,27 @@ async def test_duplicate_task_node_input() -> None:
     with build_dag(Input) as tm:
         starting_node = tm.add_immediate_node(None)
 
-        tm.add_node(merge, starting_node, starting_node)
+        tm.add_node(merge, starting_node, starting_node, tm.parameters_node)
 
     await tm.invoke(Input(expected_value))
+
+
+async def test_parameters_node_should_be_a_singleton() -> None:
+    with build_dag(Input) as tm:
+        assert tm.parameters_node is tm.parameters_node
+
+
+async def test_parameters_node_result_should_be_the_parameters() -> None:
+    expected = "FOO BAR"
+    with build_dag(str) as tm:
+        node = tm.parameters_node
+    result = await tm.invoke(expected)
+
+    assert node.extract_result(result) == expected
+
+
+async def test_parameters_node_should_never_be_called() -> None:
+    with build_dag() as tm:
+        assert tm.parameters_node is tm.parameters_node
+
+    await tm.invoke(None)
