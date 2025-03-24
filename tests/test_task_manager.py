@@ -1,6 +1,6 @@
+import asyncio
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-import asyncio
 
 import pytest
 
@@ -170,7 +170,7 @@ async def test_calling_order_of_dag() -> None:
             await asyncio.sleep(delay)
             assert expected_state == global_state.starting_number
             global_state.starting_number += 1
-            return None
+            return
 
         return inner
 
@@ -181,7 +181,7 @@ async def test_calling_order_of_dag() -> None:
             await asyncio.sleep(delay)
             assert expected_state == global_state.starting_number
             global_state.starting_number += 1
-            return None
+            return
 
         return inner
 
@@ -239,10 +239,10 @@ async def test_immediate_node_should_return_its_value() -> None:
 async def test_duplicate_task_node_input() -> None:
     expected_value = 0
 
-    async def merge(_a: None, _b: None, input: Input) -> None:
-        assert input.starting_number == expected_value
-        input.starting_number += 1
-        return None
+    async def merge(_a: None, _b: None, input_: Input) -> None:
+        assert input_.starting_number == expected_value
+        input_.starting_number += 1
+        return
 
     with build_dag(Input) as tm:
         starting_node = tm.add_immediate_node(None)
