@@ -1,16 +1,16 @@
-import inspect
 from collections.abc import Awaitable, Callable, Iterator
 from contextlib import contextmanager
-from typing import overload
+from typing import Never, overload
 
 from .execution_result import ExecutionResult
 from .state import State
 from .task_node import TaskNode
 
-type TaskCallback[_ParametersType, _ReturnType, *_Inputs] = (
-    Callable[[*_Inputs, _ParametersType], Awaitable[_ReturnType]]
-    | Callable[[*_Inputs], Awaitable[_ReturnType]]
-)
+type TaskCallback[_ReturnType, *_Inputs] = Callable[[*_Inputs], Awaitable[_ReturnType]]
+
+
+async def _unreachable(*_: object) -> Never:
+    raise ValueError("unreachable")
 
 
 class TaskManager[_ParametersType]:
@@ -20,6 +20,7 @@ class TaskManager[_ParametersType]:
         self._max_depth = 0
         self._starting_nodes_id: list[int] = []
         self._is_sorted: bool = False
+        self._parameters_node: TaskNode[_ParametersType, _ParametersType] | None = None
 
     async def invoke(
         self, parameters: _ParametersType
@@ -62,6 +63,12 @@ class TaskManager[_ParametersType]:
 
         self._is_sorted = True
 
+    @property
+    def parameters_node(self) -> TaskNode[_ParametersType, _ParametersType]:
+        if self._parameters_node is None:
+            self._parameters_node = self.add_node(_unreachable)
+        return self._parameters_node
+
     def add_immediate_node[_ReturnType](
         self, value: _ReturnType
     ) -> TaskNode[_ParametersType, _ReturnType]:
@@ -73,20 +80,20 @@ class TaskManager[_ParametersType]:
     @overload
     def add_node[_ReturnType](
         self,
-        task: TaskCallback[_ParametersType, _ReturnType],
+        task: TaskCallback[_ReturnType],
     ) -> TaskNode[_ParametersType, _ReturnType]: ...
 
     @overload
     def add_node[_ReturnType, _I_1](
         self,
-        task: TaskCallback[_ParametersType, _ReturnType, _I_1],
+        task: TaskCallback[_ReturnType, _I_1],
         arg_1: TaskNode[_ParametersType, _I_1],
     ) -> TaskNode[_ParametersType, _ReturnType]: ...
 
     @overload
     def add_node[_ReturnType, _I_1, _I_2](
         self,
-        task: TaskCallback[_ParametersType, _ReturnType, _I_1, _I_2],
+        task: TaskCallback[_ReturnType, _I_1, _I_2],
         arg_1: TaskNode[_ParametersType, _I_1],
         arg_2: TaskNode[_ParametersType, _I_2],
     ) -> TaskNode[_ParametersType, _ReturnType]: ...
@@ -94,7 +101,7 @@ class TaskManager[_ParametersType]:
     @overload
     def add_node[_ReturnType, _I_1, _I_2, _I_3](
         self,
-        task: TaskCallback[_ParametersType, _ReturnType, _I_1, _I_2, _I_3],
+        task: TaskCallback[_ReturnType, _I_1, _I_2, _I_3],
         arg_1: TaskNode[_ParametersType, _I_1],
         arg_2: TaskNode[_ParametersType, _I_2],
         arg_3: TaskNode[_ParametersType, _I_3],
@@ -103,7 +110,7 @@ class TaskManager[_ParametersType]:
     @overload
     def add_node[_ReturnType, _I_1, _I_2, _I_3, _I_4](
         self,
-        task: TaskCallback[_ParametersType, _ReturnType, _I_1, _I_2, _I_3, _I_4],
+        task: TaskCallback[_ReturnType, _I_1, _I_2, _I_3, _I_4],
         arg_1: TaskNode[_ParametersType, _I_1],
         arg_2: TaskNode[_ParametersType, _I_2],
         arg_3: TaskNode[_ParametersType, _I_3],
@@ -113,7 +120,7 @@ class TaskManager[_ParametersType]:
     @overload
     def add_node[_ReturnType, _I_1, _I_2, _I_3, _I_4, _I_5](
         self,
-        task: TaskCallback[_ParametersType, _ReturnType, _I_1, _I_2, _I_3, _I_4, _I_5],
+        task: TaskCallback[_ReturnType, _I_1, _I_2, _I_3, _I_4, _I_5],
         arg_1: TaskNode[_ParametersType, _I_1],
         arg_2: TaskNode[_ParametersType, _I_2],
         arg_3: TaskNode[_ParametersType, _I_3],
@@ -124,9 +131,7 @@ class TaskManager[_ParametersType]:
     @overload
     def add_node[_ReturnType, _I_1, _I_2, _I_3, _I_4, _I_5, _I_6](
         self,
-        task: TaskCallback[
-            _ParametersType, _ReturnType, _I_1, _I_2, _I_3, _I_4, _I_5, _I_6
-        ],
+        task: TaskCallback[_ReturnType, _I_1, _I_2, _I_3, _I_4, _I_5, _I_6],
         arg_1: TaskNode[_ParametersType, _I_1],
         arg_2: TaskNode[_ParametersType, _I_2],
         arg_3: TaskNode[_ParametersType, _I_3],
@@ -138,9 +143,7 @@ class TaskManager[_ParametersType]:
     @overload
     def add_node[_ReturnType, _I_1, _I_2, _I_3, _I_4, _I_5, _I_6, _I_7](
         self,
-        task: TaskCallback[
-            _ParametersType, _ReturnType, _I_1, _I_2, _I_3, _I_4, _I_5, _I_6, _I_7
-        ],
+        task: TaskCallback[_ReturnType, _I_1, _I_2, _I_3, _I_4, _I_5, _I_6, _I_7],
         arg_1: TaskNode[_ParametersType, _I_1],
         arg_2: TaskNode[_ParametersType, _I_2],
         arg_3: TaskNode[_ParametersType, _I_3],
@@ -153,9 +156,7 @@ class TaskManager[_ParametersType]:
     @overload
     def add_node[_ReturnType, _I_1, _I_2, _I_3, _I_4, _I_5, _I_6, _I_7, _I_8](
         self,
-        task: TaskCallback[
-            _ParametersType, _ReturnType, _I_1, _I_2, _I_3, _I_4, _I_5, _I_6, _I_7, _I_8
-        ],
+        task: TaskCallback[_ReturnType, _I_1, _I_2, _I_3, _I_4, _I_5, _I_6, _I_7, _I_8],
         arg_1: TaskNode[_ParametersType, _I_1],
         arg_2: TaskNode[_ParametersType, _I_2],
         arg_3: TaskNode[_ParametersType, _I_3],
@@ -170,7 +171,6 @@ class TaskManager[_ParametersType]:
     def add_node[_ReturnType, _I_1, _I_2, _I_3, _I_4, _I_5, _I_6, _I_7, _I_8, _I_9](
         self,
         task: TaskCallback[
-            _ParametersType,
             _ReturnType,
             _I_1,
             _I_2,
@@ -209,7 +209,6 @@ class TaskManager[_ParametersType]:
     ](
         self,
         task: TaskCallback[
-            _ParametersType,
             _ReturnType,
             _I_1,
             _I_2,
@@ -251,7 +250,6 @@ class TaskManager[_ParametersType]:
     ](
         self,
         task: TaskCallback[
-            _ParametersType,
             _ReturnType,
             _I_1,
             _I_2,
@@ -296,7 +294,6 @@ class TaskManager[_ParametersType]:
     ](
         self,
         task: TaskCallback[
-            _ParametersType,
             _ReturnType,
             _I_1,
             _I_2,
@@ -344,7 +341,6 @@ class TaskManager[_ParametersType]:
     ](
         self,
         task: TaskCallback[
-            _ParametersType,
             _ReturnType,
             _I_1,
             _I_2,
@@ -395,7 +391,6 @@ class TaskManager[_ParametersType]:
     ](
         self,
         task: TaskCallback[
-            _ParametersType,
             _ReturnType,
             _I_1,
             _I_2,
@@ -449,7 +444,6 @@ class TaskManager[_ParametersType]:
     ](
         self,
         task: TaskCallback[
-            _ParametersType,
             _ReturnType,
             _I_1,
             _I_2,
@@ -506,7 +500,6 @@ class TaskManager[_ParametersType]:
     ](
         self,
         task: TaskCallback[
-            _ParametersType,
             _ReturnType,
             _I_1,
             _I_2,
@@ -566,7 +559,6 @@ class TaskManager[_ParametersType]:
     ](
         self,
         task: TaskCallback[
-            _ParametersType,
             _ReturnType,
             _I_1,
             _I_2,
@@ -629,7 +621,6 @@ class TaskManager[_ParametersType]:
     ](
         self,
         task: TaskCallback[
-            _ParametersType,
             _ReturnType,
             _I_1,
             _I_2,
@@ -695,7 +686,6 @@ class TaskManager[_ParametersType]:
     ](
         self,
         task: TaskCallback[
-            _ParametersType,
             _ReturnType,
             _I_1,
             _I_2,
@@ -764,7 +754,6 @@ class TaskManager[_ParametersType]:
     ](
         self,
         task: TaskCallback[
-            _ParametersType,
             _ReturnType,
             _I_1,
             _I_2,
@@ -812,8 +801,7 @@ class TaskManager[_ParametersType]:
     # TODO: remove all the @overload functions once https://github.com/python/typing/issues/1216 get solved
     def add_node[_ReturnType, *_InputsType](  # type: ignore
         self,
-        task: Callable[[*_InputsType, _ParametersType], Awaitable[_ReturnType]]
-        | Callable[[*_InputsType], Awaitable[_ReturnType]],
+        task: Callable[[*_InputsType], Awaitable[_ReturnType]],
         *dependencies: TaskNode[_ParametersType, object],
     ) -> TaskNode[_ParametersType, _ReturnType]:
         if self._is_sorted:
@@ -825,14 +813,11 @@ class TaskManager[_ParametersType]:
                     f"Task manager mismatch, expected: {self} but got: {dep._task_manager}"
                 )
 
-        task_signature = inspect.signature(task)
-
         task_node = TaskNode(
             task,
             self,
             [dep_id._id for dep_id in dependencies],
             len(self._tasks),
-            len(task_signature.parameters) != len(dependencies),
         )
         self._tasks.append(task_node)
         return task_node

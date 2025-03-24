@@ -16,7 +16,7 @@ async def test_invoke_with_task_manager_mismatch_errors() -> None:
         other_tm = TaskManager[None]()
         execution_result = ExecutionResult(other_tm, None)
 
-        await node.invoke(None, execution_result)
+        await node.invoke(execution_result)
 
 
 async def test_extract_result_with_task_manager_mismatch_errors() -> None:
@@ -45,7 +45,7 @@ async def test_invoke_before_sort_errors() -> None:
         node = tm.add_node(imm)
         execution_result = ExecutionResult(tm, None)
 
-        await node.invoke(None, execution_result)
+        await node.invoke(execution_result)
 
 
 async def test_extract_result_should_return_value_from_index_from_id() -> None:
@@ -63,6 +63,6 @@ async def test_invoke_returns_its_value() -> None:
         node = tm.add_node(imm)
     execution_result = ExecutionResult(tm, None)
 
-    result = await node.invoke(None, execution_result)
+    result = await node.invoke(execution_result)
 
     assert result == await imm()
