@@ -25,7 +25,7 @@ The optimal way to run this flow would be:
 Creating this flow in code isn't trivial and require managing tasks manually, and from my experience most people miss the performance benefits of starting to execute `SlowTask_B` as soon as possible
 (because it's just easy to `gather(FastTask_A, SlowTask_A, FastTask_B)`).
 
-This library provides a simple interface for creating the optimal execution path of DAGs like those.
+This library provides a simple interface for creating the optimal execution path for async tasks that build a DAG.
 
 #### Code example
 ```python
