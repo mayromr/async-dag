@@ -1,5 +1,9 @@
 async-dag
 ---
+[![PyPI - Version](https://img.shields.io/pypi/v/async-dag)](https://pypi.org/project/async-dag/)
+[![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/nhruo123/async-dag/workflow.yml)](https://github.com/nhruo123/async-dag/actions)
+
+
 A simple library for running complex DAG of async tasks.
 
 ### Use case example
