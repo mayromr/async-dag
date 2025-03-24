@@ -14,7 +14,7 @@ async def test_invoke_with_task_manager_mismatch_errors() -> None:
             node = tm.add_node(imm)
 
         other_tm = TaskManager[None]()
-        execution_result = ExecutionResult([], other_tm)
+        execution_result = ExecutionResult(other_tm, None)
 
         await node.invoke(None, execution_result)
 
@@ -25,7 +25,7 @@ async def test_extract_result_with_task_manager_mismatch_errors() -> None:
             node = tm.add_node(imm)
 
         other_tm = TaskManager[None]()
-        execution_result = ExecutionResult([], other_tm)
+        execution_result = ExecutionResult(other_tm, None)
 
         node.extract_result(execution_result)
 
@@ -34,7 +34,7 @@ async def test_extract_result_before_sort_errors() -> None:
     with pytest.raises(ValueError):
         tm = TaskManager[None]()
         node = tm.add_node(imm)
-        execution_result = ExecutionResult([], tm)
+        execution_result = ExecutionResult(tm, None)
 
         node.extract_result(execution_result)
 
@@ -43,7 +43,7 @@ async def test_invoke_before_sort_errors() -> None:
     with pytest.raises(ValueError):
         tm = TaskManager[None]()
         node = tm.add_node(imm)
-        execution_result = ExecutionResult([], tm)
+        execution_result = ExecutionResult(tm, None)
 
         await node.invoke(None, execution_result)
 
@@ -52,17 +52,17 @@ async def test_extract_result_should_return_value_from_index_from_id() -> None:
     expected = 999
     with build_dag() as tm:
         node = tm.add_node(imm)
-    execution_result = ExecutionResult([999], tm)
+    execution_result = ExecutionResult(tm, None)
+    execution_result._results[node._id] = expected
 
     assert expected == node.extract_result(execution_result)
 
 
-async def test_invoke_assign_results_to_index_from_id() -> None:
+async def test_invoke_returns_its_value() -> None:
     with build_dag() as tm:
         node = tm.add_node(imm)
-    execution_result = ExecutionResult([None], tm)
+    execution_result = ExecutionResult(tm, None)
 
-    await node.invoke(None, execution_result)
+    result = await node.invoke(None, execution_result)
 
-    assert execution_result._results[0] == await imm()
-    assert node.extract_result(execution_result) == await imm()
+    assert result == await imm()
