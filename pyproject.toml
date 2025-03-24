@@ -1,6 +1,6 @@
 [project]
 name = "async-dag"
-version = "0.2.0"
+version = "0.2.1"
 description = "A simple library for running complex DAG of async tasks"
 readme = "README.md"
 authors = [
@@ -22,6 +22,9 @@ lint = [
     "mypy>=1.15.0",
     "ruff>=0.11.2",
 ]
+
+[tool.uv]
+default-groups = ["dev", "lint"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

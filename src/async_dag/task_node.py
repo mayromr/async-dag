@@ -8,11 +8,11 @@ if TYPE_CHECKING:
     from .task_manager import TaskManager
 
 
-class TaskNode[_ParametersType, _ReturnType]:
+class TaskNode[_ParameterType, _ReturnType]:
     def __init__(
         self,
         callback: Callable[..., Awaitable[_ReturnType]],
-        task_manager: "TaskManager[_ParametersType]",
+        task_manager: "TaskManager[_ParameterType]",
         dependencies_ids: Sequence[int],
         node_id: int,
     ) -> None:
@@ -26,7 +26,7 @@ class TaskNode[_ParametersType, _ReturnType]:
 
     async def invoke(
         self,
-        execution_result: ExecutionResult[_ParametersType],
+        execution_result: ExecutionResult[_ParameterType],
     ) -> _ReturnType:
         self._assert_state(State.PERMANENT)
         self._assert_task_manager(execution_result._task_manager)
@@ -36,7 +36,7 @@ class TaskNode[_ParametersType, _ReturnType]:
         )
 
     def extract_result(
-        self, execution_result: ExecutionResult[_ParametersType]
+        self, execution_result: ExecutionResult[_ParameterType]
     ) -> _ReturnType:
         self._assert_state(State.PERMANENT)
         self._assert_task_manager(execution_result._task_manager)
@@ -49,9 +49,7 @@ class TaskNode[_ParametersType, _ReturnType]:
                 f"TaskNode in invalid state, current state: {self._state}, expected state: {expected_state}"
             )
 
-    def _assert_task_manager(
-        self, task_manager: "TaskManager[_ParametersType]"
-    ) -> None:
+    def _assert_task_manager(self, task_manager: "TaskManager[_ParameterType]") -> None:
         if self._task_manager is not task_manager:
             raise ValueError(
                 f"Task manager mismatch, expected: {self._task_manager} but got: {task_manager}"

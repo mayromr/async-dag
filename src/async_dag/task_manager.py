@@ -7,28 +7,31 @@ from .state import State
 from .task_node import TaskNode
 
 type TaskCallback[_ReturnType, *_Inputs] = Callable[[*_Inputs], Awaitable[_ReturnType]]
+type TaskNodeOrImmediate[_ParameterType, _ReturnType] = (
+    TaskNode[_ParameterType, _ReturnType] | _ReturnType
+)
 
 
 async def _unreachable(*_: object) -> Never:
     raise ValueError("unreachable")
 
 
-class TaskManager[_ParametersType]:
+class TaskManager[_ParameterType]:
     def __init__(self) -> None:
         # NOTE: the tasks in _tasks must be a contiguous array of sorted by _id
-        self._tasks: list[TaskNode[_ParametersType, object]] = []
+        self._tasks: list[TaskNode[_ParameterType, object]] = []
         self._max_depth = 0
         self._starting_nodes_id: list[int] = []
         self._is_sorted: bool = False
-        self._parameters_node: TaskNode[_ParametersType, _ParametersType] | None = None
+        self._parameter_node: TaskNode[_ParameterType, _ParameterType] | None = None
 
     async def invoke(
-        self, parameters: _ParametersType
-    ) -> ExecutionResult[_ParametersType]:
+        self, parameter: _ParameterType
+    ) -> ExecutionResult[_ParameterType]:
         if not self._is_sorted:
             raise ValueError("'invoke' can not be called before 'sort'")
 
-        execution_result = ExecutionResult(self, parameters)
+        execution_result = ExecutionResult(self, parameter)
         await execution_result._invoke()
         return execution_result
 
@@ -36,7 +39,7 @@ class TaskManager[_ParametersType]:
         if self._is_sorted:
             raise ValueError("'sort' can only be called once")
 
-        def visit(node: TaskNode[_ParametersType, object]) -> None:
+        def visit(node: TaskNode[_ParameterType, object]) -> None:
             if node._state == State.PERMANENT:
                 return
             if node._state == State.TEMPORARY:
@@ -64,108 +67,108 @@ class TaskManager[_ParametersType]:
         self._is_sorted = True
 
     @property
-    def parameters_node(self) -> TaskNode[_ParametersType, _ParametersType]:
-        if self._parameters_node is None:
-            self._parameters_node = self.add_node(_unreachable)
-        return self._parameters_node
+    def parameter_node(self) -> TaskNode[_ParameterType, _ParameterType]:
+        if self._parameter_node is None:
+            self._parameter_node = self._add_node(_unreachable)
+        return self._parameter_node
 
     def add_immediate_node[_ReturnType](
         self, value: _ReturnType
-    ) -> TaskNode[_ParametersType, _ReturnType]:
+    ) -> TaskNode[_ParameterType, _ReturnType]:
         async def get_value() -> _ReturnType:
             return value
 
-        return self.add_node(get_value)
+        return self._add_node(get_value)
 
     @overload
     def add_node[_ReturnType](
         self,
         task: TaskCallback[_ReturnType],
-    ) -> TaskNode[_ParametersType, _ReturnType]: ...
+    ) -> TaskNode[_ParameterType, _ReturnType]: ...
 
     @overload
     def add_node[_ReturnType, _I_1](
         self,
         task: TaskCallback[_ReturnType, _I_1],
-        arg_1: TaskNode[_ParametersType, _I_1],
-    ) -> TaskNode[_ParametersType, _ReturnType]: ...
+        arg_1: TaskNodeOrImmediate[_ParameterType, _I_1],
+    ) -> TaskNode[_ParameterType, _ReturnType]: ...
 
     @overload
     def add_node[_ReturnType, _I_1, _I_2](
         self,
         task: TaskCallback[_ReturnType, _I_1, _I_2],
-        arg_1: TaskNode[_ParametersType, _I_1],
-        arg_2: TaskNode[_ParametersType, _I_2],
-    ) -> TaskNode[_ParametersType, _ReturnType]: ...
+        arg_1: TaskNodeOrImmediate[_ParameterType, _I_1],
+        arg_2: TaskNodeOrImmediate[_ParameterType, _I_2],
+    ) -> TaskNode[_ParameterType, _ReturnType]: ...
 
     @overload
     def add_node[_ReturnType, _I_1, _I_2, _I_3](
         self,
         task: TaskCallback[_ReturnType, _I_1, _I_2, _I_3],
-        arg_1: TaskNode[_ParametersType, _I_1],
-        arg_2: TaskNode[_ParametersType, _I_2],
-        arg_3: TaskNode[_ParametersType, _I_3],
-    ) -> TaskNode[_ParametersType, _ReturnType]: ...
+        arg_1: TaskNodeOrImmediate[_ParameterType, _I_1],
+        arg_2: TaskNodeOrImmediate[_ParameterType, _I_2],
+        arg_3: TaskNodeOrImmediate[_ParameterType, _I_3],
+    ) -> TaskNode[_ParameterType, _ReturnType]: ...
 
     @overload
     def add_node[_ReturnType, _I_1, _I_2, _I_3, _I_4](
         self,
         task: TaskCallback[_ReturnType, _I_1, _I_2, _I_3, _I_4],
-        arg_1: TaskNode[_ParametersType, _I_1],
-        arg_2: TaskNode[_ParametersType, _I_2],
-        arg_3: TaskNode[_ParametersType, _I_3],
-        arg_4: TaskNode[_ParametersType, _I_4],
-    ) -> TaskNode[_ParametersType, _ReturnType]: ...
+        arg_1: TaskNodeOrImmediate[_ParameterType, _I_1],
+        arg_2: TaskNodeOrImmediate[_ParameterType, _I_2],
+        arg_3: TaskNodeOrImmediate[_ParameterType, _I_3],
+        arg_4: TaskNodeOrImmediate[_ParameterType, _I_4],
+    ) -> TaskNode[_ParameterType, _ReturnType]: ...
 
     @overload
     def add_node[_ReturnType, _I_1, _I_2, _I_3, _I_4, _I_5](
         self,
         task: TaskCallback[_ReturnType, _I_1, _I_2, _I_3, _I_4, _I_5],
-        arg_1: TaskNode[_ParametersType, _I_1],
-        arg_2: TaskNode[_ParametersType, _I_2],
-        arg_3: TaskNode[_ParametersType, _I_3],
-        arg_4: TaskNode[_ParametersType, _I_4],
-        arg_5: TaskNode[_ParametersType, _I_5],
-    ) -> TaskNode[_ParametersType, _ReturnType]: ...
+        arg_1: TaskNodeOrImmediate[_ParameterType, _I_1],
+        arg_2: TaskNodeOrImmediate[_ParameterType, _I_2],
+        arg_3: TaskNodeOrImmediate[_ParameterType, _I_3],
+        arg_4: TaskNodeOrImmediate[_ParameterType, _I_4],
+        arg_5: TaskNodeOrImmediate[_ParameterType, _I_5],
+    ) -> TaskNode[_ParameterType, _ReturnType]: ...
 
     @overload
     def add_node[_ReturnType, _I_1, _I_2, _I_3, _I_4, _I_5, _I_6](
         self,
         task: TaskCallback[_ReturnType, _I_1, _I_2, _I_3, _I_4, _I_5, _I_6],
-        arg_1: TaskNode[_ParametersType, _I_1],
-        arg_2: TaskNode[_ParametersType, _I_2],
-        arg_3: TaskNode[_ParametersType, _I_3],
-        arg_4: TaskNode[_ParametersType, _I_4],
-        arg_5: TaskNode[_ParametersType, _I_5],
-        arg_6: TaskNode[_ParametersType, _I_6],
-    ) -> TaskNode[_ParametersType, _ReturnType]: ...
+        arg_1: TaskNodeOrImmediate[_ParameterType, _I_1],
+        arg_2: TaskNodeOrImmediate[_ParameterType, _I_2],
+        arg_3: TaskNodeOrImmediate[_ParameterType, _I_3],
+        arg_4: TaskNodeOrImmediate[_ParameterType, _I_4],
+        arg_5: TaskNodeOrImmediate[_ParameterType, _I_5],
+        arg_6: TaskNodeOrImmediate[_ParameterType, _I_6],
+    ) -> TaskNode[_ParameterType, _ReturnType]: ...
 
     @overload
     def add_node[_ReturnType, _I_1, _I_2, _I_3, _I_4, _I_5, _I_6, _I_7](
         self,
         task: TaskCallback[_ReturnType, _I_1, _I_2, _I_3, _I_4, _I_5, _I_6, _I_7],
-        arg_1: TaskNode[_ParametersType, _I_1],
-        arg_2: TaskNode[_ParametersType, _I_2],
-        arg_3: TaskNode[_ParametersType, _I_3],
-        arg_4: TaskNode[_ParametersType, _I_4],
-        arg_5: TaskNode[_ParametersType, _I_5],
-        arg_6: TaskNode[_ParametersType, _I_6],
-        arg_7: TaskNode[_ParametersType, _I_7],
-    ) -> TaskNode[_ParametersType, _ReturnType]: ...
+        arg_1: TaskNodeOrImmediate[_ParameterType, _I_1],
+        arg_2: TaskNodeOrImmediate[_ParameterType, _I_2],
+        arg_3: TaskNodeOrImmediate[_ParameterType, _I_3],
+        arg_4: TaskNodeOrImmediate[_ParameterType, _I_4],
+        arg_5: TaskNodeOrImmediate[_ParameterType, _I_5],
+        arg_6: TaskNodeOrImmediate[_ParameterType, _I_6],
+        arg_7: TaskNodeOrImmediate[_ParameterType, _I_7],
+    ) -> TaskNode[_ParameterType, _ReturnType]: ...
 
     @overload
     def add_node[_ReturnType, _I_1, _I_2, _I_3, _I_4, _I_5, _I_6, _I_7, _I_8](
         self,
         task: TaskCallback[_ReturnType, _I_1, _I_2, _I_3, _I_4, _I_5, _I_6, _I_7, _I_8],
-        arg_1: TaskNode[_ParametersType, _I_1],
-        arg_2: TaskNode[_ParametersType, _I_2],
-        arg_3: TaskNode[_ParametersType, _I_3],
-        arg_4: TaskNode[_ParametersType, _I_4],
-        arg_5: TaskNode[_ParametersType, _I_5],
-        arg_6: TaskNode[_ParametersType, _I_6],
-        arg_7: TaskNode[_ParametersType, _I_7],
-        arg_8: TaskNode[_ParametersType, _I_8],
-    ) -> TaskNode[_ParametersType, _ReturnType]: ...
+        arg_1: TaskNodeOrImmediate[_ParameterType, _I_1],
+        arg_2: TaskNodeOrImmediate[_ParameterType, _I_2],
+        arg_3: TaskNodeOrImmediate[_ParameterType, _I_3],
+        arg_4: TaskNodeOrImmediate[_ParameterType, _I_4],
+        arg_5: TaskNodeOrImmediate[_ParameterType, _I_5],
+        arg_6: TaskNodeOrImmediate[_ParameterType, _I_6],
+        arg_7: TaskNodeOrImmediate[_ParameterType, _I_7],
+        arg_8: TaskNodeOrImmediate[_ParameterType, _I_8],
+    ) -> TaskNode[_ParameterType, _ReturnType]: ...
 
     @overload
     def add_node[_ReturnType, _I_1, _I_2, _I_3, _I_4, _I_5, _I_6, _I_7, _I_8, _I_9](
@@ -182,16 +185,16 @@ class TaskManager[_ParametersType]:
             _I_8,
             _I_9,
         ],
-        arg_1: TaskNode[_ParametersType, _I_1],
-        arg_2: TaskNode[_ParametersType, _I_2],
-        arg_3: TaskNode[_ParametersType, _I_3],
-        arg_4: TaskNode[_ParametersType, _I_4],
-        arg_5: TaskNode[_ParametersType, _I_5],
-        arg_6: TaskNode[_ParametersType, _I_6],
-        arg_7: TaskNode[_ParametersType, _I_7],
-        arg_8: TaskNode[_ParametersType, _I_8],
-        arg_9: TaskNode[_ParametersType, _I_9],
-    ) -> TaskNode[_ParametersType, _ReturnType]: ...
+        arg_1: TaskNodeOrImmediate[_ParameterType, _I_1],
+        arg_2: TaskNodeOrImmediate[_ParameterType, _I_2],
+        arg_3: TaskNodeOrImmediate[_ParameterType, _I_3],
+        arg_4: TaskNodeOrImmediate[_ParameterType, _I_4],
+        arg_5: TaskNodeOrImmediate[_ParameterType, _I_5],
+        arg_6: TaskNodeOrImmediate[_ParameterType, _I_6],
+        arg_7: TaskNodeOrImmediate[_ParameterType, _I_7],
+        arg_8: TaskNodeOrImmediate[_ParameterType, _I_8],
+        arg_9: TaskNodeOrImmediate[_ParameterType, _I_9],
+    ) -> TaskNode[_ParameterType, _ReturnType]: ...
 
     @overload
     def add_node[
@@ -221,17 +224,17 @@ class TaskManager[_ParametersType]:
             _I_9,
             _I_10,
         ],
-        arg_1: TaskNode[_ParametersType, _I_1],
-        arg_2: TaskNode[_ParametersType, _I_2],
-        arg_3: TaskNode[_ParametersType, _I_3],
-        arg_4: TaskNode[_ParametersType, _I_4],
-        arg_5: TaskNode[_ParametersType, _I_5],
-        arg_6: TaskNode[_ParametersType, _I_6],
-        arg_7: TaskNode[_ParametersType, _I_7],
-        arg_8: TaskNode[_ParametersType, _I_8],
-        arg_9: TaskNode[_ParametersType, _I_9],
-        arg_10: TaskNode[_ParametersType, _I_10],
-    ) -> TaskNode[_ParametersType, _ReturnType]: ...
+        arg_1: TaskNodeOrImmediate[_ParameterType, _I_1],
+        arg_2: TaskNodeOrImmediate[_ParameterType, _I_2],
+        arg_3: TaskNodeOrImmediate[_ParameterType, _I_3],
+        arg_4: TaskNodeOrImmediate[_ParameterType, _I_4],
+        arg_5: TaskNodeOrImmediate[_ParameterType, _I_5],
+        arg_6: TaskNodeOrImmediate[_ParameterType, _I_6],
+        arg_7: TaskNodeOrImmediate[_ParameterType, _I_7],
+        arg_8: TaskNodeOrImmediate[_ParameterType, _I_8],
+        arg_9: TaskNodeOrImmediate[_ParameterType, _I_9],
+        arg_10: TaskNodeOrImmediate[_ParameterType, _I_10],
+    ) -> TaskNode[_ParameterType, _ReturnType]: ...
 
     @overload
     def add_node[
@@ -263,18 +266,18 @@ class TaskManager[_ParametersType]:
             _I_10,
             _I_11,
         ],
-        arg_1: TaskNode[_ParametersType, _I_1],
-        arg_2: TaskNode[_ParametersType, _I_2],
-        arg_3: TaskNode[_ParametersType, _I_3],
-        arg_4: TaskNode[_ParametersType, _I_4],
-        arg_5: TaskNode[_ParametersType, _I_5],
-        arg_6: TaskNode[_ParametersType, _I_6],
-        arg_7: TaskNode[_ParametersType, _I_7],
-        arg_8: TaskNode[_ParametersType, _I_8],
-        arg_9: TaskNode[_ParametersType, _I_9],
-        arg_10: TaskNode[_ParametersType, _I_10],
-        arg_11: TaskNode[_ParametersType, _I_11],
-    ) -> TaskNode[_ParametersType, _ReturnType]: ...
+        arg_1: TaskNodeOrImmediate[_ParameterType, _I_1],
+        arg_2: TaskNodeOrImmediate[_ParameterType, _I_2],
+        arg_3: TaskNodeOrImmediate[_ParameterType, _I_3],
+        arg_4: TaskNodeOrImmediate[_ParameterType, _I_4],
+        arg_5: TaskNodeOrImmediate[_ParameterType, _I_5],
+        arg_6: TaskNodeOrImmediate[_ParameterType, _I_6],
+        arg_7: TaskNodeOrImmediate[_ParameterType, _I_7],
+        arg_8: TaskNodeOrImmediate[_ParameterType, _I_8],
+        arg_9: TaskNodeOrImmediate[_ParameterType, _I_9],
+        arg_10: TaskNodeOrImmediate[_ParameterType, _I_10],
+        arg_11: TaskNodeOrImmediate[_ParameterType, _I_11],
+    ) -> TaskNode[_ParameterType, _ReturnType]: ...
 
     @overload
     def add_node[
@@ -308,19 +311,19 @@ class TaskManager[_ParametersType]:
             _I_11,
             _I_12,
         ],
-        arg_1: TaskNode[_ParametersType, _I_1],
-        arg_2: TaskNode[_ParametersType, _I_2],
-        arg_3: TaskNode[_ParametersType, _I_3],
-        arg_4: TaskNode[_ParametersType, _I_4],
-        arg_5: TaskNode[_ParametersType, _I_5],
-        arg_6: TaskNode[_ParametersType, _I_6],
-        arg_7: TaskNode[_ParametersType, _I_7],
-        arg_8: TaskNode[_ParametersType, _I_8],
-        arg_9: TaskNode[_ParametersType, _I_9],
-        arg_10: TaskNode[_ParametersType, _I_10],
-        arg_11: TaskNode[_ParametersType, _I_11],
-        arg_12: TaskNode[_ParametersType, _I_12],
-    ) -> TaskNode[_ParametersType, _ReturnType]: ...
+        arg_1: TaskNodeOrImmediate[_ParameterType, _I_1],
+        arg_2: TaskNodeOrImmediate[_ParameterType, _I_2],
+        arg_3: TaskNodeOrImmediate[_ParameterType, _I_3],
+        arg_4: TaskNodeOrImmediate[_ParameterType, _I_4],
+        arg_5: TaskNodeOrImmediate[_ParameterType, _I_5],
+        arg_6: TaskNodeOrImmediate[_ParameterType, _I_6],
+        arg_7: TaskNodeOrImmediate[_ParameterType, _I_7],
+        arg_8: TaskNodeOrImmediate[_ParameterType, _I_8],
+        arg_9: TaskNodeOrImmediate[_ParameterType, _I_9],
+        arg_10: TaskNodeOrImmediate[_ParameterType, _I_10],
+        arg_11: TaskNodeOrImmediate[_ParameterType, _I_11],
+        arg_12: TaskNodeOrImmediate[_ParameterType, _I_12],
+    ) -> TaskNode[_ParameterType, _ReturnType]: ...
 
     @overload
     def add_node[
@@ -356,20 +359,20 @@ class TaskManager[_ParametersType]:
             _I_12,
             _I_13,
         ],
-        arg_1: TaskNode[_ParametersType, _I_1],
-        arg_2: TaskNode[_ParametersType, _I_2],
-        arg_3: TaskNode[_ParametersType, _I_3],
-        arg_4: TaskNode[_ParametersType, _I_4],
-        arg_5: TaskNode[_ParametersType, _I_5],
-        arg_6: TaskNode[_ParametersType, _I_6],
-        arg_7: TaskNode[_ParametersType, _I_7],
-        arg_8: TaskNode[_ParametersType, _I_8],
-        arg_9: TaskNode[_ParametersType, _I_9],
-        arg_10: TaskNode[_ParametersType, _I_10],
-        arg_11: TaskNode[_ParametersType, _I_11],
-        arg_12: TaskNode[_ParametersType, _I_12],
-        arg_13: TaskNode[_ParametersType, _I_13],
-    ) -> TaskNode[_ParametersType, _ReturnType]: ...
+        arg_1: TaskNodeOrImmediate[_ParameterType, _I_1],
+        arg_2: TaskNodeOrImmediate[_ParameterType, _I_2],
+        arg_3: TaskNodeOrImmediate[_ParameterType, _I_3],
+        arg_4: TaskNodeOrImmediate[_ParameterType, _I_4],
+        arg_5: TaskNodeOrImmediate[_ParameterType, _I_5],
+        arg_6: TaskNodeOrImmediate[_ParameterType, _I_6],
+        arg_7: TaskNodeOrImmediate[_ParameterType, _I_7],
+        arg_8: TaskNodeOrImmediate[_ParameterType, _I_8],
+        arg_9: TaskNodeOrImmediate[_ParameterType, _I_9],
+        arg_10: TaskNodeOrImmediate[_ParameterType, _I_10],
+        arg_11: TaskNodeOrImmediate[_ParameterType, _I_11],
+        arg_12: TaskNodeOrImmediate[_ParameterType, _I_12],
+        arg_13: TaskNodeOrImmediate[_ParameterType, _I_13],
+    ) -> TaskNode[_ParameterType, _ReturnType]: ...
 
     @overload
     def add_node[
@@ -407,21 +410,21 @@ class TaskManager[_ParametersType]:
             _I_13,
             _I_14,
         ],
-        arg_1: TaskNode[_ParametersType, _I_1],
-        arg_2: TaskNode[_ParametersType, _I_2],
-        arg_3: TaskNode[_ParametersType, _I_3],
-        arg_4: TaskNode[_ParametersType, _I_4],
-        arg_5: TaskNode[_ParametersType, _I_5],
-        arg_6: TaskNode[_ParametersType, _I_6],
-        arg_7: TaskNode[_ParametersType, _I_7],
-        arg_8: TaskNode[_ParametersType, _I_8],
-        arg_9: TaskNode[_ParametersType, _I_9],
-        arg_10: TaskNode[_ParametersType, _I_10],
-        arg_11: TaskNode[_ParametersType, _I_11],
-        arg_12: TaskNode[_ParametersType, _I_12],
-        arg_13: TaskNode[_ParametersType, _I_13],
-        arg_14: TaskNode[_ParametersType, _I_14],
-    ) -> TaskNode[_ParametersType, _ReturnType]: ...
+        arg_1: TaskNodeOrImmediate[_ParameterType, _I_1],
+        arg_2: TaskNodeOrImmediate[_ParameterType, _I_2],
+        arg_3: TaskNodeOrImmediate[_ParameterType, _I_3],
+        arg_4: TaskNodeOrImmediate[_ParameterType, _I_4],
+        arg_5: TaskNodeOrImmediate[_ParameterType, _I_5],
+        arg_6: TaskNodeOrImmediate[_ParameterType, _I_6],
+        arg_7: TaskNodeOrImmediate[_ParameterType, _I_7],
+        arg_8: TaskNodeOrImmediate[_ParameterType, _I_8],
+        arg_9: TaskNodeOrImmediate[_ParameterType, _I_9],
+        arg_10: TaskNodeOrImmediate[_ParameterType, _I_10],
+        arg_11: TaskNodeOrImmediate[_ParameterType, _I_11],
+        arg_12: TaskNodeOrImmediate[_ParameterType, _I_12],
+        arg_13: TaskNodeOrImmediate[_ParameterType, _I_13],
+        arg_14: TaskNodeOrImmediate[_ParameterType, _I_14],
+    ) -> TaskNode[_ParameterType, _ReturnType]: ...
 
     @overload
     def add_node[
@@ -461,22 +464,22 @@ class TaskManager[_ParametersType]:
             _I_14,
             _I_15,
         ],
-        arg_1: TaskNode[_ParametersType, _I_1],
-        arg_2: TaskNode[_ParametersType, _I_2],
-        arg_3: TaskNode[_ParametersType, _I_3],
-        arg_4: TaskNode[_ParametersType, _I_4],
-        arg_5: TaskNode[_ParametersType, _I_5],
-        arg_6: TaskNode[_ParametersType, _I_6],
-        arg_7: TaskNode[_ParametersType, _I_7],
-        arg_8: TaskNode[_ParametersType, _I_8],
-        arg_9: TaskNode[_ParametersType, _I_9],
-        arg_10: TaskNode[_ParametersType, _I_10],
-        arg_11: TaskNode[_ParametersType, _I_11],
-        arg_12: TaskNode[_ParametersType, _I_12],
-        arg_13: TaskNode[_ParametersType, _I_13],
-        arg_14: TaskNode[_ParametersType, _I_14],
-        arg_15: TaskNode[_ParametersType, _I_15],
-    ) -> TaskNode[_ParametersType, _ReturnType]: ...
+        arg_1: TaskNodeOrImmediate[_ParameterType, _I_1],
+        arg_2: TaskNodeOrImmediate[_ParameterType, _I_2],
+        arg_3: TaskNodeOrImmediate[_ParameterType, _I_3],
+        arg_4: TaskNodeOrImmediate[_ParameterType, _I_4],
+        arg_5: TaskNodeOrImmediate[_ParameterType, _I_5],
+        arg_6: TaskNodeOrImmediate[_ParameterType, _I_6],
+        arg_7: TaskNodeOrImmediate[_ParameterType, _I_7],
+        arg_8: TaskNodeOrImmediate[_ParameterType, _I_8],
+        arg_9: TaskNodeOrImmediate[_ParameterType, _I_9],
+        arg_10: TaskNodeOrImmediate[_ParameterType, _I_10],
+        arg_11: TaskNodeOrImmediate[_ParameterType, _I_11],
+        arg_12: TaskNodeOrImmediate[_ParameterType, _I_12],
+        arg_13: TaskNodeOrImmediate[_ParameterType, _I_13],
+        arg_14: TaskNodeOrImmediate[_ParameterType, _I_14],
+        arg_15: TaskNodeOrImmediate[_ParameterType, _I_15],
+    ) -> TaskNode[_ParameterType, _ReturnType]: ...
 
     @overload
     def add_node[
@@ -518,23 +521,23 @@ class TaskManager[_ParametersType]:
             _I_15,
             _I_16,
         ],
-        arg_1: TaskNode[_ParametersType, _I_1],
-        arg_2: TaskNode[_ParametersType, _I_2],
-        arg_3: TaskNode[_ParametersType, _I_3],
-        arg_4: TaskNode[_ParametersType, _I_4],
-        arg_5: TaskNode[_ParametersType, _I_5],
-        arg_6: TaskNode[_ParametersType, _I_6],
-        arg_7: TaskNode[_ParametersType, _I_7],
-        arg_8: TaskNode[_ParametersType, _I_8],
-        arg_9: TaskNode[_ParametersType, _I_9],
-        arg_10: TaskNode[_ParametersType, _I_10],
-        arg_11: TaskNode[_ParametersType, _I_11],
-        arg_12: TaskNode[_ParametersType, _I_12],
-        arg_13: TaskNode[_ParametersType, _I_13],
-        arg_14: TaskNode[_ParametersType, _I_14],
-        arg_15: TaskNode[_ParametersType, _I_15],
-        arg_16: TaskNode[_ParametersType, _I_16],
-    ) -> TaskNode[_ParametersType, _ReturnType]: ...
+        arg_1: TaskNodeOrImmediate[_ParameterType, _I_1],
+        arg_2: TaskNodeOrImmediate[_ParameterType, _I_2],
+        arg_3: TaskNodeOrImmediate[_ParameterType, _I_3],
+        arg_4: TaskNodeOrImmediate[_ParameterType, _I_4],
+        arg_5: TaskNodeOrImmediate[_ParameterType, _I_5],
+        arg_6: TaskNodeOrImmediate[_ParameterType, _I_6],
+        arg_7: TaskNodeOrImmediate[_ParameterType, _I_7],
+        arg_8: TaskNodeOrImmediate[_ParameterType, _I_8],
+        arg_9: TaskNodeOrImmediate[_ParameterType, _I_9],
+        arg_10: TaskNodeOrImmediate[_ParameterType, _I_10],
+        arg_11: TaskNodeOrImmediate[_ParameterType, _I_11],
+        arg_12: TaskNodeOrImmediate[_ParameterType, _I_12],
+        arg_13: TaskNodeOrImmediate[_ParameterType, _I_13],
+        arg_14: TaskNodeOrImmediate[_ParameterType, _I_14],
+        arg_15: TaskNodeOrImmediate[_ParameterType, _I_15],
+        arg_16: TaskNodeOrImmediate[_ParameterType, _I_16],
+    ) -> TaskNode[_ParameterType, _ReturnType]: ...
 
     @overload
     def add_node[
@@ -578,24 +581,24 @@ class TaskManager[_ParametersType]:
             _I_16,
             _I_17,
         ],
-        arg_1: TaskNode[_ParametersType, _I_1],
-        arg_2: TaskNode[_ParametersType, _I_2],
-        arg_3: TaskNode[_ParametersType, _I_3],
-        arg_4: TaskNode[_ParametersType, _I_4],
-        arg_5: TaskNode[_ParametersType, _I_5],
-        arg_6: TaskNode[_ParametersType, _I_6],
-        arg_7: TaskNode[_ParametersType, _I_7],
-        arg_8: TaskNode[_ParametersType, _I_8],
-        arg_9: TaskNode[_ParametersType, _I_9],
-        arg_10: TaskNode[_ParametersType, _I_10],
-        arg_11: TaskNode[_ParametersType, _I_11],
-        arg_12: TaskNode[_ParametersType, _I_12],
-        arg_13: TaskNode[_ParametersType, _I_13],
-        arg_14: TaskNode[_ParametersType, _I_14],
-        arg_15: TaskNode[_ParametersType, _I_15],
-        arg_16: TaskNode[_ParametersType, _I_16],
-        arg_17: TaskNode[_ParametersType, _I_17],
-    ) -> TaskNode[_ParametersType, _ReturnType]: ...
+        arg_1: TaskNodeOrImmediate[_ParameterType, _I_1],
+        arg_2: TaskNodeOrImmediate[_ParameterType, _I_2],
+        arg_3: TaskNodeOrImmediate[_ParameterType, _I_3],
+        arg_4: TaskNodeOrImmediate[_ParameterType, _I_4],
+        arg_5: TaskNodeOrImmediate[_ParameterType, _I_5],
+        arg_6: TaskNodeOrImmediate[_ParameterType, _I_6],
+        arg_7: TaskNodeOrImmediate[_ParameterType, _I_7],
+        arg_8: TaskNodeOrImmediate[_ParameterType, _I_8],
+        arg_9: TaskNodeOrImmediate[_ParameterType, _I_9],
+        arg_10: TaskNodeOrImmediate[_ParameterType, _I_10],
+        arg_11: TaskNodeOrImmediate[_ParameterType, _I_11],
+        arg_12: TaskNodeOrImmediate[_ParameterType, _I_12],
+        arg_13: TaskNodeOrImmediate[_ParameterType, _I_13],
+        arg_14: TaskNodeOrImmediate[_ParameterType, _I_14],
+        arg_15: TaskNodeOrImmediate[_ParameterType, _I_15],
+        arg_16: TaskNodeOrImmediate[_ParameterType, _I_16],
+        arg_17: TaskNodeOrImmediate[_ParameterType, _I_17],
+    ) -> TaskNode[_ParameterType, _ReturnType]: ...
 
     @overload
     def add_node[
@@ -641,25 +644,25 @@ class TaskManager[_ParametersType]:
             _I_17,
             _I_18,
         ],
-        arg_1: TaskNode[_ParametersType, _I_1],
-        arg_2: TaskNode[_ParametersType, _I_2],
-        arg_3: TaskNode[_ParametersType, _I_3],
-        arg_4: TaskNode[_ParametersType, _I_4],
-        arg_5: TaskNode[_ParametersType, _I_5],
-        arg_6: TaskNode[_ParametersType, _I_6],
-        arg_7: TaskNode[_ParametersType, _I_7],
-        arg_8: TaskNode[_ParametersType, _I_8],
-        arg_9: TaskNode[_ParametersType, _I_9],
-        arg_10: TaskNode[_ParametersType, _I_10],
-        arg_11: TaskNode[_ParametersType, _I_11],
-        arg_12: TaskNode[_ParametersType, _I_12],
-        arg_13: TaskNode[_ParametersType, _I_13],
-        arg_14: TaskNode[_ParametersType, _I_14],
-        arg_15: TaskNode[_ParametersType, _I_15],
-        arg_16: TaskNode[_ParametersType, _I_16],
-        arg_17: TaskNode[_ParametersType, _I_17],
-        arg_18: TaskNode[_ParametersType, _I_18],
-    ) -> TaskNode[_ParametersType, _ReturnType]: ...
+        arg_1: TaskNodeOrImmediate[_ParameterType, _I_1],
+        arg_2: TaskNodeOrImmediate[_ParameterType, _I_2],
+        arg_3: TaskNodeOrImmediate[_ParameterType, _I_3],
+        arg_4: TaskNodeOrImmediate[_ParameterType, _I_4],
+        arg_5: TaskNodeOrImmediate[_ParameterType, _I_5],
+        arg_6: TaskNodeOrImmediate[_ParameterType, _I_6],
+        arg_7: TaskNodeOrImmediate[_ParameterType, _I_7],
+        arg_8: TaskNodeOrImmediate[_ParameterType, _I_8],
+        arg_9: TaskNodeOrImmediate[_ParameterType, _I_9],
+        arg_10: TaskNodeOrImmediate[_ParameterType, _I_10],
+        arg_11: TaskNodeOrImmediate[_ParameterType, _I_11],
+        arg_12: TaskNodeOrImmediate[_ParameterType, _I_12],
+        arg_13: TaskNodeOrImmediate[_ParameterType, _I_13],
+        arg_14: TaskNodeOrImmediate[_ParameterType, _I_14],
+        arg_15: TaskNodeOrImmediate[_ParameterType, _I_15],
+        arg_16: TaskNodeOrImmediate[_ParameterType, _I_16],
+        arg_17: TaskNodeOrImmediate[_ParameterType, _I_17],
+        arg_18: TaskNodeOrImmediate[_ParameterType, _I_18],
+    ) -> TaskNode[_ParameterType, _ReturnType]: ...
 
     @overload
     def add_node[
@@ -707,26 +710,26 @@ class TaskManager[_ParametersType]:
             _I_18,
             _I_19,
         ],
-        arg_1: TaskNode[_ParametersType, _I_1],
-        arg_2: TaskNode[_ParametersType, _I_2],
-        arg_3: TaskNode[_ParametersType, _I_3],
-        arg_4: TaskNode[_ParametersType, _I_4],
-        arg_5: TaskNode[_ParametersType, _I_5],
-        arg_6: TaskNode[_ParametersType, _I_6],
-        arg_7: TaskNode[_ParametersType, _I_7],
-        arg_8: TaskNode[_ParametersType, _I_8],
-        arg_9: TaskNode[_ParametersType, _I_9],
-        arg_10: TaskNode[_ParametersType, _I_10],
-        arg_11: TaskNode[_ParametersType, _I_11],
-        arg_12: TaskNode[_ParametersType, _I_12],
-        arg_13: TaskNode[_ParametersType, _I_13],
-        arg_14: TaskNode[_ParametersType, _I_14],
-        arg_15: TaskNode[_ParametersType, _I_15],
-        arg_16: TaskNode[_ParametersType, _I_16],
-        arg_17: TaskNode[_ParametersType, _I_17],
-        arg_18: TaskNode[_ParametersType, _I_18],
-        arg_19: TaskNode[_ParametersType, _I_19],
-    ) -> TaskNode[_ParametersType, _ReturnType]: ...
+        arg_1: TaskNodeOrImmediate[_ParameterType, _I_1],
+        arg_2: TaskNodeOrImmediate[_ParameterType, _I_2],
+        arg_3: TaskNodeOrImmediate[_ParameterType, _I_3],
+        arg_4: TaskNodeOrImmediate[_ParameterType, _I_4],
+        arg_5: TaskNodeOrImmediate[_ParameterType, _I_5],
+        arg_6: TaskNodeOrImmediate[_ParameterType, _I_6],
+        arg_7: TaskNodeOrImmediate[_ParameterType, _I_7],
+        arg_8: TaskNodeOrImmediate[_ParameterType, _I_8],
+        arg_9: TaskNodeOrImmediate[_ParameterType, _I_9],
+        arg_10: TaskNodeOrImmediate[_ParameterType, _I_10],
+        arg_11: TaskNodeOrImmediate[_ParameterType, _I_11],
+        arg_12: TaskNodeOrImmediate[_ParameterType, _I_12],
+        arg_13: TaskNodeOrImmediate[_ParameterType, _I_13],
+        arg_14: TaskNodeOrImmediate[_ParameterType, _I_14],
+        arg_15: TaskNodeOrImmediate[_ParameterType, _I_15],
+        arg_16: TaskNodeOrImmediate[_ParameterType, _I_16],
+        arg_17: TaskNodeOrImmediate[_ParameterType, _I_17],
+        arg_18: TaskNodeOrImmediate[_ParameterType, _I_18],
+        arg_19: TaskNodeOrImmediate[_ParameterType, _I_19],
+    ) -> TaskNode[_ParameterType, _ReturnType]: ...
 
     @overload
     def add_node[
@@ -776,34 +779,47 @@ class TaskManager[_ParametersType]:
             _I_19,
             _I_20,
         ],
-        arg_1: TaskNode[_ParametersType, _I_1],
-        arg_2: TaskNode[_ParametersType, _I_2],
-        arg_3: TaskNode[_ParametersType, _I_3],
-        arg_4: TaskNode[_ParametersType, _I_4],
-        arg_5: TaskNode[_ParametersType, _I_5],
-        arg_6: TaskNode[_ParametersType, _I_6],
-        arg_7: TaskNode[_ParametersType, _I_7],
-        arg_8: TaskNode[_ParametersType, _I_8],
-        arg_9: TaskNode[_ParametersType, _I_9],
-        arg_10: TaskNode[_ParametersType, _I_10],
-        arg_11: TaskNode[_ParametersType, _I_11],
-        arg_12: TaskNode[_ParametersType, _I_12],
-        arg_13: TaskNode[_ParametersType, _I_13],
-        arg_14: TaskNode[_ParametersType, _I_14],
-        arg_15: TaskNode[_ParametersType, _I_15],
-        arg_16: TaskNode[_ParametersType, _I_16],
-        arg_17: TaskNode[_ParametersType, _I_17],
-        arg_18: TaskNode[_ParametersType, _I_18],
-        arg_19: TaskNode[_ParametersType, _I_19],
-        arg_20: TaskNode[_ParametersType, _I_20],
-    ) -> TaskNode[_ParametersType, _ReturnType]: ...
+        arg_1: TaskNodeOrImmediate[_ParameterType, _I_1],
+        arg_2: TaskNodeOrImmediate[_ParameterType, _I_2],
+        arg_3: TaskNodeOrImmediate[_ParameterType, _I_3],
+        arg_4: TaskNodeOrImmediate[_ParameterType, _I_4],
+        arg_5: TaskNodeOrImmediate[_ParameterType, _I_5],
+        arg_6: TaskNodeOrImmediate[_ParameterType, _I_6],
+        arg_7: TaskNodeOrImmediate[_ParameterType, _I_7],
+        arg_8: TaskNodeOrImmediate[_ParameterType, _I_8],
+        arg_9: TaskNodeOrImmediate[_ParameterType, _I_9],
+        arg_10: TaskNodeOrImmediate[_ParameterType, _I_10],
+        arg_11: TaskNodeOrImmediate[_ParameterType, _I_11],
+        arg_12: TaskNodeOrImmediate[_ParameterType, _I_12],
+        arg_13: TaskNodeOrImmediate[_ParameterType, _I_13],
+        arg_14: TaskNodeOrImmediate[_ParameterType, _I_14],
+        arg_15: TaskNodeOrImmediate[_ParameterType, _I_15],
+        arg_16: TaskNodeOrImmediate[_ParameterType, _I_16],
+        arg_17: TaskNodeOrImmediate[_ParameterType, _I_17],
+        arg_18: TaskNodeOrImmediate[_ParameterType, _I_18],
+        arg_19: TaskNodeOrImmediate[_ParameterType, _I_19],
+        arg_20: TaskNodeOrImmediate[_ParameterType, _I_20],
+    ) -> TaskNode[_ParameterType, _ReturnType]: ...
 
     # TODO: remove all the @overload functions once https://github.com/python/typing/issues/1216 get solved
     def add_node[_ReturnType, *_InputsType](  # type: ignore
         self,
         task: Callable[[*_InputsType], Awaitable[_ReturnType]],
-        *dependencies: TaskNode[_ParametersType, object],
-    ) -> TaskNode[_ParametersType, _ReturnType]:
+        *dependencies: TaskNodeOrImmediate[_ParameterType, object],
+    ) -> TaskNode[_ParameterType, _ReturnType]:
+        return self._add_node(
+            task,
+            *(
+                dep if isinstance(dep, TaskNode) else self.add_immediate_node(dep)
+                for dep in dependencies
+            ),
+        )
+
+    def _add_node[_ReturnType, *_InputsType](
+        self,
+        task: Callable[[*_InputsType], Awaitable[_ReturnType]],
+        *dependencies: TaskNode[_ParameterType, object],
+    ) -> TaskNode[_ParameterType, _ReturnType]:
         if self._is_sorted:
             raise ValueError("'add_node' can not be called after 'sort'")
 
