@@ -1,38 +1,3 @@
-async-dag
----
-[![PyPI - Version](https://img.shields.io/pypi/v/async-dag)](https://pypi.org/project/async-dag/)
-[![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/nhruo123/async-dag/workflow.yml)](https://github.com/nhruo123/async-dag/actions)
-
-
-A simple library for running complex DAG of async tasks.
-
-### Use case example
-
-Lets assume that you have the following task dependencies graph:
-```mermaid
-graph TD;
-    FastTask_A-->SlowTask_B;
-    SlowTask_B-->EndTask;
-
-    SlowTask_A-->FastTask_C;
-    FastTask_B-->FastTask_C;
-    FastTask_C-->EndTask;
-```
-
-The optimal way to run this flow would be:
-
-1) Run `FastTask_A`, `FastTask_B`, and `SlowTask_A` all at once,
-2) as soon as `FastTask_A` ends, start executing `SlowTask_B`
-3) as soon as `SlowTask_A` and `FastTask_B` ends, start executing `FastTask_C`
-4) as soon as `SlowTask_B` and `FastTask_C` ends, start executing `EndTask`
-
-Creating this flow in code isn't trivial and require managing tasks manually, and from my experience most people miss the performance benefits of starting to execute `SlowTask_B` as soon as possible
-(because it's just easy to `gather(FastTask_A, SlowTask_A, FastTask_B)`).
-
-This library provides a simple interface for creating the optimal execution path for async tasks that build a DAG.
-
-#### Code example
-```python
 import asyncio
 
 from async_dag import build_dag
@@ -167,4 +132,3 @@ async def builtin_alternative() -> None:
 if __name__ == "__main__":
     asyncio.run(main())
     asyncio.run(builtin_alternative())
-```

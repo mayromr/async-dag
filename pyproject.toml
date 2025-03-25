@@ -1,6 +1,6 @@
 [project]
 name = "async-dag"
-version = "0.2.1"
+version = "0.2.2"
 description = "A simple library for running complex DAG of async tasks"
 readme = "README.md"
 authors = [
@@ -23,8 +23,13 @@ lint = [
     "ruff>=0.11.2",
 ]
 
-[tool.uv]
-default-groups = ["dev", "lint"]
+
+[tool.hatch.build.targets.sdist]
+exclude = [
+  "/.github",
+  "/docs",
+  "/examples",
+]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
@@ -57,7 +62,6 @@ select = [
   "ISC",
   "LOG",
   "PIE",
-  "T20",
   "PYI",
   "SIM",
   "RUF",
