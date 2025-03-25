@@ -1,6 +1,7 @@
 import asyncio
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
+from typing import Never
 
 import pytest
 
@@ -38,6 +39,10 @@ async def inc_str(n: str) -> int:
 
 async def inc_max(a: int, b: int) -> int:
     return max(a, b) + 1
+
+
+async def raise_exception(exception: Exception, _: int) -> Never:
+    raise exception
 
 
 async def test_task_manager_sanity() -> None:
@@ -215,8 +220,10 @@ async def test_calling_order_of_dag() -> None:
             merge_path_to_end_node_2,
             tm.parameter_node,
         )
+    context = Input(1)
+    await tm.invoke(context)
 
-    await tm.invoke(Input(1))
+    assert context.starting_number == 7
 
 
 async def test_add_node_with_mixed_managers_errors() -> None:
@@ -288,3 +295,17 @@ async def test_immediate_value_get_converted_to_node() -> None:
 
     result = await tm.invoke(None)
     assert node.extract_result(result) == expected_value
+
+
+async def test_raised_error_should_reach_the_caller() -> None:
+    expected = ValueError("FOO BAR")
+    with build_dag() as tm:
+        node_1 = tm.add_node(inc, 0)
+        node_2 = tm.add_node(inc, node_1)
+        node_3 = tm.add_node(inc, node_2)
+        tm.add_node(raise_exception, expected, node_3)
+
+    try:
+        await tm.invoke(None)
+    except ExceptionGroup as actual:
+        assert actual.exceptions[0] == expected
