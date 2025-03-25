@@ -7,6 +7,12 @@ if TYPE_CHECKING:
 
 
 class ExecutionResult[_ParameterType]:
+    """
+    `ExecutionResult` represents the return values of all the nodes in a DAG for a specific `invoke` call.
+    This class does not export any API, and should only be used when returned from `invoke` in order to pass to `TaskNode.extract_result` or for type annotations.
+    **You should never initialize this class by yourself!**
+    """
+
     def __init__(
         self, task_manager: "TaskManager[_ParameterType]", parameter: _ParameterType
     ) -> None:
@@ -22,7 +28,7 @@ class ExecutionResult[_ParameterType]:
     async def _invoke_task(
         self, task: "TaskNode[_ParameterType, object]", tg: asyncio.TaskGroup
     ) -> None:
-        self._on_task_completion(task, await task.invoke(self), tg)
+        self._on_task_completion(task, await task._invoke(self), tg)
 
     def _on_task_completion(
         self,

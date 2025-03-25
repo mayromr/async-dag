@@ -1,7 +1,7 @@
 [project]
 name = "async-dag"
-version = "0.2.2"
-description = "A simple library for running complex DAG of async tasks"
+version = "0.3.0"
+description = "A simple library for running complex DAG of async tasks while ensuring maximum possible parallelism"
 readme = "README.md"
 authors = [
     { name = "Mayrom Rabinovich", email = "nhruo123@gmail.com" }

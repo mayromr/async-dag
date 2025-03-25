@@ -4,11 +4,11 @@ async-dag
 [![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/nhruo123/async-dag/workflow.yml)](https://github.com/nhruo123/async-dag/actions)
 
 
-A simple library for running complex DAG of async tasks.
+A simple library for running complex DAG of async tasks while ensuring maximum possible parallelism.
 
-### Use case example
+### Use case and example
 
-Lets assume that you have the following task dependencies graph:
+Lets assume that you have the following task dependencies graph (each task is an async function that could take time to resolve, and some tasks may depends on each other):
 ```mermaid
 graph TD;
     FastTask_A-->SlowTask_B;
@@ -19,152 +19,76 @@ graph TD;
     FastTask_C-->EndTask;
 ```
 
-The optimal way to run this flow would be:
-
-1) Run `FastTask_A`, `FastTask_B`, and `SlowTask_A` all at once,
-2) as soon as `FastTask_A` ends, start executing `SlowTask_B`
-3) as soon as `SlowTask_A` and `FastTask_B` ends, start executing `FastTask_C`
-4) as soon as `SlowTask_B` and `FastTask_C` ends, start executing `EndTask`
-
-Creating this flow in code isn't trivial and require managing tasks manually, and from my experience most people miss the performance benefits of starting to execute `SlowTask_B` as soon as possible
-(because it's just easy to `gather(FastTask_A, SlowTask_A, FastTask_B)`).
-
-This library provides a simple interface for creating the optimal execution path for async tasks that build a DAG.
-
-#### Code example
+A naive way to write something like this would be:
 ```python
-import asyncio
+await end_task(await slow_task_b(await fast_task_a()), await fast_task_c(await slow_task_a(), await fast_task_b()))
+```
+But that would be bad because we will miss a lot of opportunities to run tasks in parallel.
 
+A better version would be:
+```python
+fast_task_a_res, slow_task_a_res, fast_task_b_res = await asyncio.gather(fast_task_a(), slow_task_a(), fast_task_b())
+await end_task(await slow_task_b(fast_task_a), await fast_task_c(slow_task_a, fast_task_b))
+```
+Where we run `fast_task_a_res`, `slow_task_a_res`, and `fast_task_b_res` in parallel.
+but this is still suboptimal because we can start executing either `slow_task_b` once `fast_task_a` ends or `fast_task_c` once both `slow_task_a` and `fast_task_b`.
+
+The optimal way to run this flow would be:
+```python
+async def _left_branch():
+    return await slow_task_b(await fast_task_a())
+
+async def _right_branch():
+    slow_task_a_res, fast_task_b_res = await asyncio.gather(
+        slow_task_a(), slow_task_b()
+    )
+
+    return await fast_task_c(slow_task_a_res, fast_task_b_res)
+
+async def _end_node():
+    left_branch_res, right_branch_res = await asyncio.gather(
+        _left_branch(), _right_branch()
+    )
+
+    return await end_task(left_branch_res, right_branch_res)
+
+await _end_node()
+```
+Which is very cumbersome and error prone to write by hand.
+
+
+Using `async_dag` you can just write:
+```python
 from async_dag import build_dag
 
+# Define your DAG
+with build_dag() as tm:
+    fast_task_a_node = tm.add_node(fast_task_a)
+    slow_task_b_node = tm.add_node(slow_task_b, fast_task_a_node)
 
-async def inc_task(n: int, name: str, delay: float) -> int:
-    print(f"{name} task started...")
-    await asyncio.sleep(delay)
-    print(f"{name} task done!")
+    slow_task_a_node = tm.add_node(slow_task_a)
+    fast_task_b_node = tm.add_node(fast_task_b)
+    fast_task_c_node = tm.add_node(fast_task_c, slow_task_a_node, fast_task_b_node)
 
-    return n + 1
+    end_task_node = tm.add_node(end_task, slow_task_b_node, fast_task_c_node)
 
+# Execute your DAG
+execution_result = await tm.invoke(None) 
 
-async def add_task(a: int, b: int, name: str, delay: float) -> int:
-    print(f"{name} task started...")
-    await asyncio.sleep(delay)
-    print(f"{name} task done!")
-
-    return a + b
-
-
-# Define the DAG (O(|V| + |E|) operation, where V is the number of vertices (nodes) and E is the number of edges in the DAG)
-with build_dag(int) as tm:
-    # Each node is made of an async function, and the parameters that will get passed to it at invoke time, a parameter can be either a value or another node.
-    # We are essentially creating a partially applied async function, just like `functools.partial`.
-
-    # tm.parameter_node is a spacial node that will get resolved into the invoke parameter (the value passed to `tm.invoke`)
-    # you can also pass an immediate value to the node as a constant that will be the same across all invocations
-    fast_task_a = tm.add_node(
-        inc_task,
-        tm.parameter_node,
-        "fast_task_a",
-        0.1,
-    )
-
-    # here we pass the result from fast_task_a as the n param to inc_task node
-    slow_task_b = tm.add_node(
-        inc_task,
-        fast_task_a,
-        "slow_task_b",
-        1,
-    )
-
-    slow_task_a = tm.add_node(
-        inc_task,
-        tm.parameter_node,
-        "slow_task_a",
-        0.5,
-    )
-    fast_task_b = tm.add_node(
-        inc_task,
-        tm.parameter_node,
-        "fast_task_b",
-        0.2,
-    )
-    fast_task_c = tm.add_node(
-        add_task,
-        slow_task_a,
-        fast_task_b,
-        "fast_task_c",
-        0.1,
-    )
-
-    end_task = tm.add_node(add_task, fast_task_c, slow_task_b, "end_task", 0.1)
-
-
-# Invoke the DAG (O(|V|) operation , where V is the number of vertices (noes) in the DAG)
-async def main() -> None:
-    # In order to execute our partially applied DAG we call `tm.invoke` and pass in the parameters, we can invoke the same DAG many times after we have fully built it.
-    # each run returns an `ExecutionResult` which can be used to extract the return value of each node by calling `extract_result` on the node.
-
-    # prints:
-    # fast_task_a task started...
-    # slow_task_a task started...
-    # fast_task_b task started...
-    # fast_task_a task done!
-    # slow_task_b task started...
-    # fast_task_b task done!
-    # slow_task_a task done!
-    # fast_task_c task started...
-    # fast_task_c task done!
-    # slow_task_b task done!
-    # end_task task started...
-    # end_task task done!
-    execution_result = await tm.invoke(0)
-
-    # we can extract each node return value
-    print(fast_task_a.extract_result(execution_result))  # 1
-    print(end_task.extract_result(execution_result))  # 4
-
-
-# Here is what you would of needed to do without async-dag in order to achieve maximum parallelism
-# Note that this is a simple example, each breach would cause us to create more step functions and each merge would require gather
-async def builtin_alternative() -> None:
-    # Note that we need to create coroutines to handle each "branch" of our DAG
-    # Also note that we can't access any of the intermediate steps without explicitly returning them, unlike async-dag
-    async def _left_branch(param: int) -> int:
-        fast_task_a_res = await inc_task(param, "fast_task_a", 0.1)
-        return await inc_task(fast_task_a_res, "slow_task_b", 1)
-
-    async def _right_branch(param: int) -> int:
-        slow_task_a_res, fast_task_b_res = await asyncio.gather(
-            inc_task(param, "slow_task_a", 0.5), inc_task(param, "fast_task_b", 0.2)
-        )
-
-        return await add_task(slow_task_a_res, fast_task_b_res, "fast_task_c", 0.1)
-
-    async def _my_task(param: int) -> int:
-        left_branch_res, right_branch_res = await asyncio.gather(
-            _left_branch(param), _right_branch(param)
-        )
-
-        return await add_task(left_branch_res, right_branch_res, "end_task", 0.1)
-
-    # prints:
-    # fast_task_a task started...
-    # slow_task_a task started...
-    # fast_task_b task started...
-    # fast_task_a task done!
-    # slow_task_b task started...
-    # fast_task_b task done!
-    # slow_task_a task done!
-    # fast_task_c task started...
-    # fast_task_c task done!
-    # slow_task_b task done!
-    # end_task task started...
-    # end_task task done!
-    result = await _my_task(0)
-    print(result)  # 4
-
-
-if __name__ == "__main__":
-    asyncio.run(main())
-    asyncio.run(builtin_alternative())
+# Extract the return value of `end_task`
+end_task_result = end_task_node.extract_result(execution_result)
 ```
+
+
+### Docs and more examples
+We use Docstring in order to describe our API, the main ideas you need to know are:
+1. The [TaskManager](./src/async_dag/task_manager.py) class.
+2. The [add_node](./src/async_dag/task_manager.py) method on `TaskManager`.
+3. The [parameter_node](./src/async_dag/task_manager.py) property of `TaskManager`.
+4. The [sort](./src/async_dag/task_manager.py) method of `TaskManager`.
+5. The [invoke](./src/async_dag/task_manager.py) method of `TaskManager`.
+6. The [extract_result](./src/async_dag/task_node.py) method of `TaskNode`.
+7. The [build_dag](./src/async_dag/task_manager.py) helper function.
+
+
+For a full example please look at [./examples/readme.py](./examples/readme.py).

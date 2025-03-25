@@ -17,6 +17,40 @@ async def _unreachable(*_: object) -> Never:
 
 
 class TaskManager[_ParameterType]:
+    """
+    ### TaskManager
+    `TaskManager` is the main building block of `async_dag`, it provides an interface to build and run DAGs.
+    The four main APIs that are relevant to you are:
+    1. `add_node(async_task, param_a, param_b, ...)` - adds a new node to the graph go to function signature for feature information.
+    2. `parameter_node` - a spacial property of `TaskManager` that when passed as a dependency of a task will resolve to the parameter passed to `invoke`.
+    3. `sort()` - sorts the DAG and ready the TaskManager up for upcoming `invoke` calls.
+    4. `invoke(parameter)` - execute the tasks in the DAG with a given parameter returns an `ExecutionResult`.
+    4. `TaskNode.extract_result(execution_result)` - extracts the result returned from the task passed to the node.
+
+    You can also use the helper function `build_dag` that provides a context manager and handle calling sort for you.
+
+    All of the listed methods, properties and functions listed here have strings with a deeper explanation.
+
+    #### Example
+    ```python
+    async def add(n: int) -> int:
+        return n + 1
+
+    tm = TaskManager[int]() # Define a dag that receives an int as a parameter
+
+    # Build the DAG
+    node_1 = tm.add_node(add, tm.parameter_node) # use the parameter passed to `tm.invoke`
+    node_2 = tm.add_node(add, node_1) # use the value returned from node_1
+    node_3 = tm.add_node(add, node_2) # use the value returned from node_2
+
+    tm.sort() # sorts the DAG and ready the `TaskManager` for `invoke` calls
+
+    execution_result = await tm.invoke(0) # Invoke our DAG
+
+    # Extract the result from one of the nodes
+    print(node_3.extract_result(execution_result)) # prints 3
+    """
+
     def __init__(self) -> None:
         # NOTE: the tasks in _tasks must be a contiguous array of sorted by _id
         self._tasks: list[TaskNode[_ParameterType, object]] = []
@@ -28,6 +62,13 @@ class TaskManager[_ParameterType]:
     async def invoke(
         self, parameter: _ParameterType
     ) -> ExecutionResult[_ParameterType]:
+        """
+        Execute the DAG, this functions `parameter` argument will be passed to each node that is depending on the spacial `parameter_node`.
+
+        This function should only be called after `sort` was called, any calls to it before `sort` was called raise a `ValueError`.
+
+        If any task raises an exception this function will raise a `ExceptionGroup` with that exception and any other exceptions raised during the cancellation of the rest of the tasks.
+        """
         if not self._is_sorted:
             raise ValueError("'invoke' can not be called before 'sort'")
 
@@ -36,6 +77,14 @@ class TaskManager[_ParameterType]:
         return execution_result
 
     def sort(self) -> None:
+        """
+        Ready the `TaskManager` for `invoke` calls, this method check that the created graph is indeed a DAG,
+        If a cycle is detected a `ValueError` will be raised.
+
+        This function should only be called once, any call after the first will raise a `ValueError`.
+
+        Do not call this function if you are using the `build_dag` helper function.
+        """
         if self._is_sorted:
             raise ValueError("'sort' can only be called once")
 
@@ -68,6 +117,7 @@ class TaskManager[_ParameterType]:
 
     @property
     def parameter_node(self) -> TaskNode[_ParameterType, _ParameterType]:
+        """A spacial node that represents the parameter value, if a node `TaskNode` depends on this node it will receive the value passed to `invoke`."""
         if self._parameter_node is None:
             self._parameter_node = self._add_node(_unreachable)
         return self._parameter_node
@@ -807,6 +857,15 @@ class TaskManager[_ParameterType]:
         task: Callable[[*_InputsType], Awaitable[_ReturnType]],
         *dependencies: TaskNodeOrImmediate[_ParameterType, object],
     ) -> TaskNode[_ParameterType, _ReturnType]:
+        """
+        This functions is the heart of this library, each call to this function adds a new node in our execution DAG.
+
+        This function receives a `task` which is a partially applied coroutine (uncalled) which will get called once all the `dependencies` passed in the following arguments are satisfied.
+
+        The `dependencies` parameters could either be an immediate value (not a `TaskNode`) that will get resolved immediately upon calling `invoke` (hance the name immediate),
+        or a `TaskNode` which will act as a dependency to that task.
+        You can look at this function the same way as you look at `functools.partial`, but in addition to parameters we can also pass the task dependencies.
+        """
         return self._add_node(
             task,
             *(
@@ -851,6 +910,32 @@ def build_dag[T](parameter_type: type[T]) -> Iterator[TaskManager[T]]: ...
 
 @contextmanager  # type: ignore
 def build_dag[T](_: type[T] | None = None) -> Iterator[TaskManager[T]]:
+    """
+    A helper function that returns a context manager that calls sort for you on the `TaskManager` it creates.
+    This is useful for creating an indented section that defines your DAG.
+
+    The first parameter defines the type T of `TaskManager[T]` which sets the `invoke(parameter: T)` parameter type.
+
+    #### Example:
+    ```python
+    async def add(n: int) -> int:
+        return n + 1
+
+    # Define a dag that receives an int as a parameter
+    with build_dag(int) as tm:
+        # Build the DAG
+        node_1 = tm.add_node(add, tm.parameter_node) # use the parameter passed to `tm.invoke`
+        node_2 = tm.add_node(add, node_1) # use the value returned from node_1
+        node_3 = tm.add_node(add, node_2) # use the value returned from node_2
+
+    # After we exited the `with` block we can already call `tm.invoke` because the context manager handled the `sort` call for us.
+
+    execution_result = await tm.invoke(0) # Invoke our DAG
+
+    # Extract the result from one of the nodes
+    print(node_3.extract_result(execution_result)) # prints 3
+    ```
+    """
     task_manager = TaskManager[T]()
 
     yield task_manager
