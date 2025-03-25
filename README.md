@@ -78,10 +78,11 @@ execution_result = await tm.invoke(None)
 # Extract the return value of `end_task`
 end_task_result = end_task_node.extract_result(execution_result)
 ```
+And enjoy from maximum parallelism without the hassle.
 
 
 ### Docs and more examples
-We use Docstring in order to describe our API, the main ideas you need to know are:
+We use Docstring in order to describe our API, the main concepts you need to know are:
 1. The [TaskManager](./src/async_dag/task_manager.py) class.
 2. The [add_node](./src/async_dag/task_manager.py) method on `TaskManager`.
 3. The [parameter_node](./src/async_dag/task_manager.py) property of `TaskManager`.
