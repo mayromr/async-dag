@@ -49,6 +49,7 @@ class TaskManager[_ParameterType]:
 
     # Extract the result from one of the nodes
     print(node_3.extract_result(execution_result)) # prints 3
+    ```
     """
 
     def __init__(self) -> None:

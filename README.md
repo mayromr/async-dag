@@ -28,7 +28,7 @@ But that would be bad because we will miss a lot of opportunities to run tasks i
 A better version would be:
 ```python
 fast_task_a_res, slow_task_a_res, fast_task_b_res = await asyncio.gather(fast_task_a(), slow_task_a(), fast_task_b())
-await end_task(await slow_task_b(fast_task_a), await fast_task_c(slow_task_a, fast_task_b))
+await end_task(await slow_task_b(fast_task_a_res), await fast_task_c(slow_task_a_res, fast_task_b_res))
 ```
 Where we run `fast_task_a_res`, `slow_task_a_res`, and `fast_task_b_res` in parallel.
 but this is still suboptimal because we can start executing either `slow_task_b` once `fast_task_a` ends or `fast_task_c` once both `slow_task_a` and `fast_task_b`.
@@ -40,7 +40,7 @@ async def _left_branch():
 
 async def _right_branch():
     slow_task_a_res, fast_task_b_res = await asyncio.gather(
-        slow_task_a(), slow_task_b()
+        slow_task_a(), fast_task_b()
     )
 
     return await fast_task_c(slow_task_a_res, fast_task_b_res)
