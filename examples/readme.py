@@ -19,7 +19,7 @@ async def add_task(a: int, b: int, name: str, delay: float) -> int:
     return a + b
 
 
-# Define the DAG (O(|V| + |E|) operation, where V is the number of vertices (nodes) and E is the number of edges in the DAG)
+# Define the DAG
 with build_dag(int) as tm:
     # Each node is made of an async function, and the parameters that will get passed to it at invoke time, a parameter can be either a value or another node.
     # We are essentially creating a partially applied async function, just like `functools.partial`.
@@ -64,7 +64,7 @@ with build_dag(int) as tm:
     end_task = tm.add_node(add_task, fast_task_c, slow_task_b, "end_task", 0.1)
 
 
-# Invoke the DAG (O(|V|) operation , where V is the number of vertices (noes) in the DAG)
+# Invoke the DAG
 async def main() -> None:
     # In order to execute our partially applied DAG we call `tm.invoke` and pass in the parameters, we can invoke the same DAG many times after we have fully built it.
     # each run returns an `ExecutionResult` which can be used to extract the return value of each node by calling `extract_result` on the node.
