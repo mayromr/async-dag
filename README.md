@@ -79,7 +79,7 @@ execution_result = await tm.invoke(None)
 # Extract the return value of `end_task`
 end_task_result = end_task_node.extract_result(execution_result)
 ```
-And enjoy from maximum parallelism without the hassle.
+And enjoy maximum parallelism without the hassle of creating a lot of async functions by hand.
 
 
 ### Docs and more examples
