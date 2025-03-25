@@ -92,4 +92,4 @@ We use Docstring in order to describe our API, the main concepts you need to kno
 7. The [build_dag](./src/async_dag/task_manager.py) helper function.
 
 
-For a full example please look at [./examples/readme.py](./examples/readme.py).
+For a full example take a look at [./examples/readme.py](./examples/readme.py).
