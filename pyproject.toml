@@ -1,6 +1,6 @@
 [project]
 name = "async-dag"
-version = "0.3.0"
+version = "0.3.1"
 description = "A simple library for running complex DAG of async tasks while ensuring maximum possible parallelism"
 readme = "README.md"
 authors = [

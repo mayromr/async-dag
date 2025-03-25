@@ -83,13 +83,13 @@ And enjoy from maximum parallelism without the hassle.
 
 ### Docs and more examples
 We use Docstring in order to describe our API, the main concepts you need to know are:
-1. The [TaskManager](./src/async_dag/task_manager.py) class.
-2. The [add_node](./src/async_dag/task_manager.py) method on `TaskManager`.
-3. The [parameter_node](./src/async_dag/task_manager.py) property of `TaskManager`.
-4. The [sort](./src/async_dag/task_manager.py) method of `TaskManager`.
-5. The [invoke](./src/async_dag/task_manager.py) method of `TaskManager`.
-6. The [extract_result](./src/async_dag/task_node.py) method of `TaskNode`.
-7. The [build_dag](./src/async_dag/task_manager.py) helper function.
+1. The [TaskManager](https://github.com/nhruo123/async-dag/blob/main/src/async_dag/task_manager.py) class.
+2. The [add_node](https://github.com/nhruo123/async-dag/blob/main/src/async_dag/task_manager.py) method on `TaskManager`.
+3. The [parameter_node](https://github.com/nhruo123/async-dag/blob/main/src/async_dag/task_manager.py) property of `TaskManager`.
+4. The [sort](https://github.com/nhruo123/async-dag/blob/main/src/async_dag/task_manager.py) method of `TaskManager`.
+5. The [invoke](https://github.com/nhruo123/async-dag/blob/main/src/async_dag/task_manager.py) method of `TaskManager`.
+6. The [extract_result](https://github.com/nhruo123/async-dag/blob/main/src/async_dag/task_node.py) method of `TaskNode`.
+7. The [build_dag](https://github.com/nhruo123/async-dag/blob/main/src/async_dag/task_manager.py) helper function.
 
 
-For a full example take a look at [./examples/readme.py](./examples/readme.py).
+For a full example take a look at [examples/readme.py](https://github.com/nhruo123/async-dag/blob/main/examples/readme.py).
