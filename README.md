@@ -96,6 +96,7 @@ end_task_result = end_task_node.extract_result(execution_result)
 ```
 And enjoy maximum parallelism without the hassle of creating a lot of async functions by hand.
 
+**For a full example take a look at [examples/readme.py](https://github.com/nhruo123/async-dag/blob/main/examples/readme.py).**
 
 ### Docs and more examples
 We use Docstring in order to describe our API, the main concepts you need to know are:
@@ -106,6 +107,3 @@ We use Docstring in order to describe our API, the main concepts you need to kno
 5. The [invoke](https://github.com/nhruo123/async-dag/blob/main/src/async_dag/task_manager.py) method of `TaskManager`.
 6. The [extract_result](https://github.com/nhruo123/async-dag/blob/main/src/async_dag/task_node.py) method of `TaskNode`.
 7. The [build_dag](https://github.com/nhruo123/async-dag/blob/main/src/async_dag/task_manager.py) helper function.
-
-
-For a full example take a look at [examples/readme.py](https://github.com/nhruo123/async-dag/blob/main/examples/readme.py).
