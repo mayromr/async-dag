@@ -21,14 +21,26 @@ graph TD;
 
 A naive way to write something like this would be:
 ```python
-await end_task(await slow_task_b(await fast_task_a()), await fast_task_c(await slow_task_a(), await fast_task_b()))
+await end_task(
+    await slow_task_b(
+        await fast_task_a()
+    ),
+    await fast_task_c(
+        await slow_task_a(),
+        await fast_task_b()
+    )
+)
 ```
 But that would be bad because we will miss a lot of opportunities to run tasks in parallel.
 
 A better version would be:
 ```python
-fast_task_a_res, slow_task_a_res, fast_task_b_res = await asyncio.gather(fast_task_a(), slow_task_a(), fast_task_b())
-slow_task_b_res, fast_task_c_res = await asyncio.gather(slow_task_b(fast_task_a_res), fast_task_c(slow_task_a_res, fast_task_b_res))
+fast_task_a_res, slow_task_a_res, fast_task_b_res = await asyncio.gather(
+    fast_task_a(), slow_task_a(), fast_task_b()
+)
+slow_task_b_res, fast_task_c_res = await asyncio.gather(
+    slow_task_b(fast_task_a_res), fast_task_c(slow_task_a_res, fast_task_b_res)
+)
 await end_task(slow_task_b_res, fast_task_c_res)
 ```
 Where we run `fast_task_a_res`, `slow_task_a_res`, and `fast_task_b_res` in parallel, and then after we are done with them we run `slow_task_b` and `fast_task_c`.
@@ -39,6 +51,7 @@ The optimal way to run this flow would be:
 async def _left_branch():
     return await slow_task_b(await fast_task_a())
 
+
 async def _right_branch():
     slow_task_a_res, fast_task_b_res = await asyncio.gather(
         slow_task_a(), fast_task_b()
@@ -46,12 +59,14 @@ async def _right_branch():
 
     return await fast_task_c(slow_task_a_res, fast_task_b_res)
 
+
 async def _end_node():
     left_branch_res, right_branch_res = await asyncio.gather(
         _left_branch(), _right_branch()
     )
 
     return await end_task(left_branch_res, right_branch_res)
+
 
 await _end_node()
 ```
